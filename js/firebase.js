@@ -332,13 +332,18 @@ document.addEventListener('DOMContentLoaded', () => {
       topbarActions.insertBefore(btn, topbarActions.lastElementChild);
     }
 
-    // Patch simpanData() agar auto-sync ke Firebase
-    const ori = window.simpanData;
-    if (typeof ori === 'function') {
-      window.simpanData = function() {
-        ori.call(this);                                          // simpan lokal dulu
-        if (window.FB && window.FB.uid) window.fbSimpanSemua(); // lalu ke cloud
-      };
-    }
-  }, 600);
-});
+    // Patch simpanData() tanpa auto cloud loop
+const ori = window.simpanData;
+
+if (typeof ori === 'function') {
+
+  window.simpanData = function() {
+
+    ori.call(this);
+
+    // Cloud sync manual only
+    // window.fbSimpanSemua();
+
+  };
+
+}
