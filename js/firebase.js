@@ -168,7 +168,8 @@ window.fbListenRealtime = function() {
   window.FB.listeners.data = dataRef;
 
   onValue(dataRef, (snap) => {
-    if (!snap.exists()) return;
+    if (isSyncingFirebase) return;
+     if (!snap.exists()) return;
     const data = snap.val();
 
     if (data.produk && JSON.stringify(data.produk) !== JSON.stringify(window.produk)) {
@@ -198,34 +199,46 @@ window.fbListenRealtime = function() {
 /* ══════════════════════════════════════════
    SIMPAN KE REALTIME DATABASE
 ══════════════════════════════════════════ */
+let isSyncingFirebase = false;
 window.fbSimpanSemua = async function() {
-   console.log('fbSimpanSemua DIPANGGIL');
-   if (!window.FB.uid) return;
+
+  if (!window.FB.uid) return;
+
+  // cegah loop save
+  if (isSyncingFirebase) return;
+
+  isSyncingFirebase = true;
 
   showSyncBadge('syncing');
 
   try {
 
     await set(tokoRef('data'), {
-      produk:     window.produk || [],
-      laporan:    window.laporan || [],
-      riwayat:    window.riwayat || [],
-      statistik:  window.statistikProduk || {},
+      produk: window.produk || [],
+      laporan: window.laporan || [],
+      riwayat: window.riwayat || [],
+      statistik: window.statistikProduk || {},
       pengaturan: window.pengaturan || {},
-      updatedAt:  Date.now()
+      updatedAt: Date.now()
     });
 
     showSyncBadge('synced');
 
     setTimeout(() => {
       showSyncBadge('online');
-    }, 2000);
+    }, 1500);
 
   } catch(e) {
 
     console.error('fbSimpanSemua:', e);
 
     showSyncBadge('error');
+
+  } finally {
+
+    setTimeout(() => {
+      isSyncingFirebase = false;
+    }, 500);
 
   }
 };
