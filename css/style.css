@@ -309,7 +309,8 @@ td { padding:9px 10px; font-size:13px; vertical-align:middle; }
   .chart-card { grid-column:span 3; }
 }
 @media(max-width:900px) {
-  .dashboard { grid-template-columns:1fr 1fr; }
+  .dashboard { grid-template-columns:repeat(2,1fr); }
+  .dash-card:last-of-type { grid-column: span 2; }
   .chart-card { grid-column:span 2; }
   .main { grid-template-columns:1fr; }
   .right-col { order:-1; }
