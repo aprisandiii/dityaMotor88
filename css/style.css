@@ -122,6 +122,7 @@ kbd { font-family:'JetBrains Mono',monospace; }
 .chart-card {
   background:var(--bg2); border:1px solid var(--border);
   border-radius:var(--radius); padding:14px 16px;
+   grid-column: 1 / -1;
 }
 .chart-card .chart-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
 .chart-card .chart-header h3 { font-size:13px; font-weight:700; }
