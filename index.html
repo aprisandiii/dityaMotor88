@@ -4,38 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>dityaMotor 88 — Kasir Digital</title>
-
-  <!-- PWA Meta -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#f5c542">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="dityaMotor">
-
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- SweetAlert2 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-
-  <!-- App CSS -->
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<!-- ══ LOGIN PIN SCREEN ══ -->
+<!-- ══ LOGIN ══ -->
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-logo">🔧</div>
     <h2>dityaMotor 88</h2>
     <p>Masukkan PIN untuk membuka kasir</p>
     <div class="pin-dots">
-      <div class="pin-dot" id="dot0"></div>
-      <div class="pin-dot" id="dot1"></div>
-      <div class="pin-dot" id="dot2"></div>
-      <div class="pin-dot" id="dot3"></div>
+      <div class="pin-dot" id="dot0"></div><div class="pin-dot" id="dot1"></div>
+      <div class="pin-dot" id="dot2"></div><div class="pin-dot" id="dot3"></div>
     </div>
     <p class="pin-error-msg" id="pinErrorMsg"></p>
     <div class="pin-pad">
@@ -55,12 +45,12 @@
   </div>
 </div>
 
-<!-- ══ APP CONTENT ══ -->
+<!-- ══ APP ══ -->
 <div id="appContent" style="display:none">
 
-<!-- PWA Install Banner -->
+<!-- PWA Banner -->
 <div id="pwaInstallBanner">
-  <span>📱 Install dityaMotor 88 sebagai aplikasi di perangkat Anda!</span>
+  <span>📱 Install dityaMotor 88 sebagai aplikasi!</span>
   <div style="display:flex;gap:8px">
     <button onclick="installPWA()">Install</button>
     <button onclick="dismissPWA()" style="background:transparent;color:var(--text2);border:1px solid var(--border2)">✕</button>
@@ -77,12 +67,22 @@
     </div>
   </div>
   <div class="topbar-actions">
-    <span class="version-tag">v3.0</span>
+    <span class="version-tag">v4.0</span>
     <button onclick="logout()">🔒 <span class="btn-label">Kunci</span></button>
     <button onclick="gantiPin()">🔑 <span class="btn-label">Ganti PIN</span></button>
+    <button onclick="bukaModalHutang()" style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#ef4444">💳 <span class="btn-label">Hutang</span></button>
     <button onclick="bukaModalPengaturan()">⚙️ <span class="btn-label">Pengaturan</span></button>
     <button onclick="bukaModalSheets()" style="background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.3);color:#22c55e">🔗 <span class="btn-label">Sheets</span></button>
   </div>
+</div>
+
+<!-- SHORTCUT HINT -->
+<div style="background:var(--bg3);border-bottom:1px solid var(--border);padding:4px 20px;font-size:10px;color:var(--text3);display:flex;gap:16px">
+  <span>⌨️ Shortcuts:</span>
+  <span><kbd style="background:var(--border2);padding:1px 5px;border-radius:3px;font-size:10px">F2</kbd> Cari Produk</span>
+  <span><kbd style="background:var(--border2);padding:1px 5px;border-radius:3px;font-size:10px">F4</kbd> Checkout</span>
+  <span><kbd style="background:var(--border2);padding:1px 5px;border-radius:3px;font-size:10px">F6</kbd> Cetak Nota</span>
+  <span><kbd style="background:var(--border2);padding:1px 5px;border-radius:3px;font-size:10px">Esc</kbd> Tutup Modal</span>
 </div>
 
 <!-- ALERT STOK -->
@@ -90,228 +90,144 @@
 
 <!-- DASHBOARD -->
 <div class="dashboard">
-  <div class="dash-card green">
-    <div class="d-label">Omzet Hari Ini</div>
-    <div class="d-value" id="dashOmzet">Rp 0</div>
+  <div class="dash-card green"><div class="d-label">Omzet Hari Ini</div><div class="d-value" id="dashOmzet">Rp 0</div></div>
+  <div class="dash-card gold"><div class="d-label">Laba Hari Ini</div><div class="d-value" id="dashLaba">Rp 0</div></div>
+  <div class="dash-card blue"><div class="d-label">Transaksi</div><div class="d-value" id="dashTrx">0</div></div>
+  <div class="dash-card red"><div class="d-label">Stok Kritis</div><div class="d-value" id="dashStokKritis">0</div></div>
+  <div class="dash-card" style="border-top:2px solid var(--red);cursor:pointer" onclick="bukaModalHutang()">
+    <div class="d-label">Hutang Belum Lunas</div>
+    <div class="d-value" id="dashHutang" style="color:var(--red)">0</div>
   </div>
-  <div class="dash-card gold">
-    <div class="d-label">Laba Hari Ini</div>
-    <div class="d-value" id="dashLaba">Rp 0</div>
-  </div>
-  <div class="dash-card blue">
-    <div class="d-label">Transaksi</div>
-    <div class="d-value" id="dashTrx">0</div>
-  </div>
-  <div class="dash-card red">
-    <div class="d-label">Stok Kritis</div>
-    <div class="d-value" id="dashStokKritis">0</div>
-  </div>
-
-  <!-- GRAFIK 7 HARI -->
-  <div class="chart-card">
-    <div class="chart-header">
-      <h3>📈 Grafik Omzet & Laba 7 Hari Terakhir</h3>
-    </div>
+  <div class="chart-card" style="grid-column:span 3">
+    <div class="chart-header"><h3>📈 Grafik Omzet & Laba 7 Hari Terakhir</h3></div>
     <canvas id="salesChartCanvas"></canvas>
   </div>
 </div>
 
 <!-- MAIN -->
 <div class="main">
-
-  <!-- ── LEFT COL ── -->
   <div class="left-col">
 
-    <!-- PRODUK CARD -->
+    <!-- PRODUK -->
     <div class="card">
       <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('tab-tambah',this)">+ Tambah Produk</button>
-        <button class="tab-btn" onclick="switchTab('tab-daftar',this)">📦 Daftar Produk</button>
+        <button class="tab-btn active" onclick="switchTab('tab-tambah',this)">+ Tambah</button>
+        <button class="tab-btn" onclick="switchTab('tab-daftar',this)">📦 Produk</button>
+        <button class="tab-btn" onclick="switchTab('tab-terlaris',this)">🏆 Terlaris</button>
+        <button class="tab-btn" onclick="switchTab('tab-stoklog',this)">📋 Log Stok</button>
       </div>
-
       <!-- Tab Tambah -->
       <div class="tab-panel active card-body" id="tab-tambah">
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Nama Produk</label>
-            <input type="text" id="namaProduk" placeholder="Nama produk...">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Kategori</label>
-            <select id="kategoriProduk">
-              <option value="">-- Pilih --</option>
-              <option>Oli</option><option>Spare Part</option><option>Aksesoris</option>
-              <option>Ban</option><option>Aki</option><option>Lainnya</option>
-            </select>
+          <div class="form-group"><label class="form-label">Nama Produk</label><input type="text" id="namaProduk" placeholder="Nama produk..."></div>
+          <div class="form-group"><label class="form-label">Kategori</label>
+            <select id="kategoriProduk"><option value="">-- Pilih --</option><option>Oli</option><option>Spare Part</option><option>Aksesoris</option><option>Ban</option><option>Aki</option><option>Lainnya</option></select>
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Harga Modal (HPP)</label>
-            <input type="text" id="hargaModalProduk" placeholder="0" oninput="rpPreview(this,'prevModal')">
-            <div class="rp-preview" id="prevModal"></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Harga Jual</label>
-            <input type="text" id="hargaProduk" placeholder="0" oninput="rpPreview(this,'prevJual')">
-            <div class="rp-preview" id="prevJual"></div>
-          </div>
+          <div class="form-group"><label class="form-label">Harga Modal (HPP)</label><input type="text" id="hargaModalProduk" placeholder="0" oninput="rpPreview(this,'prevModal')"><div class="rp-preview" id="prevModal"></div></div>
+          <div class="form-group"><label class="form-label">Harga Jual</label><input type="text" id="hargaProduk" placeholder="0" oninput="rpPreview(this,'prevJual')"><div class="rp-preview" id="prevJual"></div></div>
         </div>
         <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Stok Awal</label>
-            <input type="number" id="stokProduk" placeholder="0" min="0">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Min. Stok Alert</label>
-            <input type="number" id="stokMinProduk" placeholder="3" min="0" value="3">
-          </div>
+          <div class="form-group"><label class="form-label">Stok Awal</label><input type="number" id="stokProduk" placeholder="0" min="0"></div>
+          <div class="form-group"><label class="form-label">Min. Stok Alert</label><input type="number" id="stokMinProduk" placeholder="3" min="0" value="3"></div>
         </div>
         <button class="btn btn-primary btn-full" onclick="tambahProduk()">+ Tambah Produk</button>
       </div>
-
       <!-- Tab Daftar -->
       <div class="tab-panel card-body" id="tab-daftar">
         <div class="search-row">
           <input type="text" id="searchProduk" placeholder="🔍 Cari produk..." oninput="renderProduk()">
           <select id="filterKategori" onchange="renderProduk()">
-            <option value="">Semua</option>
-            <option>Oli</option><option>Spare Part</option><option>Aksesoris</option>
-            <option>Ban</option><option>Aki</option><option>Lainnya</option>
+            <option value="">Semua</option><option>Oli</option><option>Spare Part</option><option>Aksesoris</option><option>Ban</option><option>Aki</option><option>Lainnya</option>
           </select>
         </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead>
-              <tr><th>Produk</th><th>Harga Jual</th><th>Stok</th><th>Aksi</th></tr>
-            </thead>
-            <tbody id="produkList"></tbody>
-          </table>
+        <div class="tbl-wrap"><table><thead><tr><th>Produk</th><th>Harga Jual</th><th>Stok</th><th>Aksi</th></tr></thead><tbody id="produkList"></tbody></table></div>
+      </div>
+      <!-- Tab Terlaris -->
+      <div class="tab-panel card-body" id="tab-terlaris">
+        <canvas id="terlarisChart" style="max-height:200px;margin-bottom:16px"></canvas>
+        <div id="terlarisListContainer"></div>
+      </div>
+      <!-- Tab Log Stok -->
+      <div class="tab-panel card-body" id="tab-stoklog">
+        <div class="search-row" style="margin-bottom:12px">
+          <input type="text" id="searchStokLog" placeholder="🔍 Cari produk..." oninput="renderStokLog()">
         </div>
+        <div class="tbl-wrap"><table><thead><tr><th>Waktu</th><th>Produk</th><th>Tipe</th><th>Stok</th><th>Keterangan</th></tr></thead><tbody id="stokLogList"></tbody></table></div>
       </div>
     </div>
 
-    <!-- LAPORAN CARD -->
+    <!-- LAPORAN -->
     <div class="card">
       <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('tab-laporan',this)">📊 Laporan Harian</button>
-        <button class="tab-btn" onclick="switchTab('tab-riwayat',this)">🧾 Riwayat Transaksi</button>
+        <button class="tab-btn active" onclick="switchTab('tab-laporan',this)">📊 Harian</button>
+        <button class="tab-btn" onclick="switchTab('tab-mingguan',this)">📅 Mingguan</button>
+        <button class="tab-btn" onclick="switchTab('tab-bulanan',this)">📆 Bulanan</button>
+        <button class="tab-btn" onclick="switchTab('tab-riwayat',this)">🧾 Riwayat</button>
       </div>
-
-      <!-- Tab Laporan -->
+      <!-- Tab Laporan Harian -->
       <div class="tab-panel active card-body" id="tab-laporan">
-        <!-- Filter Laporan -->
         <div class="filter-row" style="margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:6px;flex:1">
-            <label class="form-label" style="margin:0;white-space:nowrap">Dari:</label>
-            <input type="date" id="filterLaporanDari" onchange="renderLaporan()" style="flex:1">
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;flex:1">
-            <label class="form-label" style="margin:0;white-space:nowrap">Sampai:</label>
-            <input type="date" id="filterLaporanSampai" onchange="renderLaporan()" style="flex:1">
-          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex:1"><label class="form-label" style="margin:0;white-space:nowrap">Dari:</label><input type="date" id="filterLaporanDari" onchange="renderLaporan()" style="flex:1"></div>
+          <div style="display:flex;align-items:center;gap:6px;flex:1"><label class="form-label" style="margin:0;white-space:nowrap">Sampai:</label><input type="date" id="filterLaporanSampai" onchange="renderLaporan()" style="flex:1"></div>
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('filterLaporanDari').value='';document.getElementById('filterLaporanSampai').value='';renderLaporan()">Reset</button>
         </div>
-
         <div class="export-grid" style="margin-bottom:12px">
-          <button class="btn btn-ghost btn-sm" onclick="exportLaporanCsv()">📊 Export CSV</button>
-          <button class="btn btn-ghost btn-sm" onclick="exportLaporanTxt()">📄 Export TXT</button>
-          <button class="btn btn-ghost btn-sm" onclick="exportExcel()" style="color:var(--green);border-color:rgba(34,197,94,0.3)">📗 Export Excel</button>
-          <button class="btn btn-ghost btn-sm" onclick="backupData()">💾 Backup JSON</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportLaporanCsv()">📊 CSV</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportLaporanTxt()">📄 TXT</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportExcel()" style="color:var(--green);border-color:rgba(34,197,94,0.3)">📗 Excel</button>
+          <button class="btn btn-ghost btn-sm" onclick="backupData()">💾 Backup</button>
           <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">📂 Restore</button>
-          <button class="btn btn-ghost btn-sm" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="kirimLaporanKeSheets()">📤 Kirim ke Sheets</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--green);border-color:rgba(34,197,94,0.3)" onclick="kirimLaporanKeSheets()">📤 Sheets</button>
         </div>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="restoreBackup(event)">
-        <div class="tbl-wrap">
-          <table>
-            <thead>
-              <tr><th>Tanggal</th><th>Omzet</th><th>Laba</th><th>Trx</th><th>Terlaris</th></tr>
-            </thead>
-            <tbody id="laporanList"></tbody>
-          </table>
-        </div>
-        <div style="margin-top:10px">
-          <button class="btn btn-danger btn-sm" onclick="resetLaporan()">🗑 Reset Laporan</button>
-        </div>
+        <div class="tbl-wrap"><table><thead><tr><th>Tanggal</th><th>Omzet</th><th>Laba</th><th>Trx</th><th>Terlaris</th></tr></thead><tbody id="laporanList"></tbody></table></div>
+        <div style="margin-top:10px"><button class="btn btn-danger btn-sm" onclick="resetLaporan()">🗑 Reset Laporan</button></div>
       </div>
-
+      <!-- Tab Mingguan -->
+      <div class="tab-panel card-body" id="tab-mingguan">
+        <div class="tbl-wrap"><table><thead><tr><th>Minggu</th><th>Omzet</th><th>Laba</th><th>Trx</th></tr></thead><tbody id="mingguanList"></tbody></table></div>
+      </div>
+      <!-- Tab Bulanan -->
+      <div class="tab-panel card-body" id="tab-bulanan">
+        <div class="tbl-wrap"><table><thead><tr><th>Bulan</th><th>Omzet</th><th>Laba</th><th>Trx</th></tr></thead><tbody id="bulananList"></tbody></table></div>
+      </div>
       <!-- Tab Riwayat -->
       <div class="tab-panel card-body" id="tab-riwayat">
-        <!-- Filter Riwayat -->
         <div class="filter-row" style="margin-bottom:12px">
           <input type="text" id="filterRiwayatCari" placeholder="🔍 Cari no. transaksi / produk..." oninput="renderRiwayat()" style="flex:2">
           <select id="filterRiwayatMetode" onchange="renderRiwayat()" style="flex:1">
-            <option value="">Semua Metode</option>
-            <option value="Tunai">Tunai</option>
-            <option value="Transfer">Transfer</option>
-            <option value="QRIS">QRIS</option>
+            <option value="">Semua Metode</option><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option><option value="QRIS">QRIS</option>
           </select>
         </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead>
-              <tr><th>Waktu</th><th>Total</th><th>Metode</th><th>Detail</th><th>Aksi</th></tr>
-            </thead>
-            <tbody id="riwayatList"></tbody>
-          </table>
-        </div>
-        <div style="margin-top:10px">
-          <button class="btn btn-danger btn-sm" onclick="resetRiwayat()">🗑 Reset Riwayat</button>
-        </div>
+        <div class="tbl-wrap"><table><thead><tr><th>Waktu</th><th>Total</th><th>Metode</th><th>Detail</th><th>Aksi</th></tr></thead><tbody id="riwayatList"></tbody></table></div>
+        <div style="margin-top:10px"><button class="btn btn-danger btn-sm" onclick="resetRiwayat()">🗑 Reset Riwayat</button></div>
       </div>
     </div>
 
   </div>
 
-  <!-- ── RIGHT COL ── -->
+  <!-- RIGHT COL -->
   <div class="right-col">
     <div class="card">
-      <div class="card-header">
-        <h2>🛒 Keranjang Belanja</h2>
-        <button class="btn btn-danger btn-xs" onclick="kosongkanCart()">Kosongkan</button>
-      </div>
+      <div class="card-header"><h2>🛒 Keranjang Belanja</h2><button class="btn btn-danger btn-xs" onclick="kosongkanCart()">Kosongkan</button></div>
       <div class="card-body">
-        <div class="tbl-wrap">
-          <table>
-            <thead>
-              <tr><th>Produk</th><th>Harga</th><th>Qty</th><th>Sub</th><th></th></tr>
-            </thead>
-            <tbody id="cartList"></tbody>
-          </table>
-        </div>
-        <div id="cartEmpty" class="empty-state">
-          <div class="icon">🛒</div>
-          Keranjang kosong.<br>Klik <b>+</b> pada produk untuk menambah.
-        </div>
-
-        <!-- TOTAL BOX -->
-        <div class="total-box" id="totalBox">
+        <div class="tbl-wrap"><table><thead><tr><th>Produk</th><th>Harga</th><th>Qty</th><th>Sub</th><th></th></tr></thead><tbody id="cartList"></tbody></table></div>
+        <div id="cartEmpty" class="empty-state"><div class="icon">🛒</div>Keranjang kosong.<br>Klik <b>+</b> pada produk untuk menambah.</div>
+        <div class="total-box">
           <div class="total-row"><span>Subtotal</span><span id="totalSubtotal">Rp 0</span></div>
           <div class="total-row diskon" id="diskonRow" style="display:none"><span>Diskon</span><span id="diskonAmt">- Rp 0</span></div>
           <hr class="total-sep">
           <div class="total-row main"><span>TOTAL</span><span id="totalAkhirDisplay">Rp 0</span></div>
         </div>
-
-        <!-- DISKON -->
         <div class="diskon-row">
-          <div class="form-group" style="flex:1;margin:0">
-            <label class="form-label">Diskon</label>
-            <input type="text" id="diskonNilai" placeholder="0" oninput="hitungDiskon()">
-          </div>
-          <select id="diskonTipe" onchange="hitungDiskon()" style="width:72px;align-self:flex-end;margin-bottom:0">
-            <option value="nominal">Rp</option>
-            <option value="persen">%</option>
-          </select>
+          <div class="form-group" style="flex:1;margin:0"><label class="form-label">Diskon</label><input type="text" id="diskonNilai" placeholder="0" oninput="hitungDiskon()"></div>
+          <select id="diskonTipe" onchange="hitungDiskon()" style="width:72px;align-self:flex-end;margin-bottom:0"><option value="nominal">Rp</option><option value="persen">%</option></select>
         </div>
-
-        <!-- METODE & BAYAR -->
         <div class="form-group">
           <label class="form-label">Metode Pembayaran</label>
-          <select id="metodeBayar">
-            <option value="Tunai">💵 Tunai</option>
-            <option value="Transfer">🏦 Transfer Bank</option>
-            <option value="QRIS">📱 QRIS</option>
-          </select>
+          <select id="metodeBayar"><option value="Tunai">💵 Tunai</option><option value="Transfer">🏦 Transfer Bank</option><option value="QRIS">📱 QRIS</option></select>
         </div>
         <div class="form-group">
           <label class="form-label">Jumlah Bayar (tunai)</label>
@@ -319,36 +235,43 @@
           <div class="rp-preview" id="prevBayar"></div>
         </div>
         <div class="form-group">
-          <label class="form-label">Nama Kasir</label>
-          <input type="text" id="namaKasir" placeholder="Admin" value="Admin">
+          <label class="form-label">Kasir</label>
+          <select id="namaKasir"></select>
         </div>
-
-        <button class="btn btn-success btn-full" style="margin-bottom:8px" onclick="checkout()">✔ Proses Checkout</button>
-        <button class="btn btn-ghost btn-full" onclick="cetakStruklangsung()" id="btnCetak" style="display:none">🖨 Cetak Nota</button>
-
+        <button class="btn btn-success btn-full" style="margin-bottom:8px" onclick="checkout()">✔ Proses Checkout <small style="opacity:.7">(F4)</small></button>
+        <button class="btn btn-ghost btn-full" onclick="cetakStruklangsung()" id="btnCetak" style="display:none">🖨 Cetak Nota <small style="opacity:.7">(F6)</small></button>
         <div id="syncStatus" class="sync-status"></div>
         <button class="btn btn-full" id="btnKirimSheets" onclick="kirimKeSheets()" style="display:none;margin-top:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#22c55e">📤 Kirim ke Google Sheets</button>
-
-        <!-- STRUK (hidden, for print) -->
         <div class="receipt" id="receipt"></div>
       </div>
     </div>
   </div>
-
 </div>
 
-<!-- PRINT AREA -->
 <div id="printArea"></div>
 
 <!-- ══ MODAL PENGATURAN ══ -->
 <div class="modal-overlay" id="modalPengaturan">
-  <div class="modal">
+  <div class="modal" style="max-width:540px">
     <h2>⚙️ Pengaturan Toko</h2>
-    <div class="form-group"><label class="form-label">Nama Toko</label><input type="text" id="setNamaToko"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nama Toko</label><input type="text" id="setNamaToko"></div>
+      <div class="form-group"><label class="form-label">Nomor Telepon</label><input type="text" id="setTelepon"></div>
+    </div>
     <div class="form-group"><label class="form-label">Alamat</label><input type="text" id="setAlamat"></div>
-    <div class="form-group"><label class="form-label">Nomor Telepon</label><input type="text" id="setTelepon"></div>
-    <div class="form-group"><label class="form-label">Footer Nota 1</label><input type="text" id="setFooter1"></div>
-    <div class="form-group"><label class="form-label">Footer Nota 2</label><input type="text" id="setFooter2"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Footer Nota 1</label><input type="text" id="setFooter1"></div>
+      <div class="form-group"><label class="form-label">Footer Nota 2</label><input type="text" id="setFooter2"></div>
+    </div>
+    <div class="form-group"><label class="form-label">No. WhatsApp (untuk kirim nota)</label><input type="text" id="setWaNumber" placeholder="628xxxxxxxxxx"></div>
+    <div class="form-group">
+      <label class="form-label">Daftar Kasir</label>
+      <div id="kasirListContainer" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="inputKasirBaru" placeholder="Nama kasir baru..." style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="tambahKasirBaru()">+ Tambah</button>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-success" onclick="simpanPengaturan()">💾 Simpan</button>
       <button class="btn btn-ghost" onclick="tutupModal('modalPengaturan')">Batal</button>
@@ -363,11 +286,7 @@
     <input type="hidden" id="editIndex">
     <div class="form-group"><label class="form-label">Nama Produk</label><input type="text" id="editNama"></div>
     <div class="form-group"><label class="form-label">Kategori</label>
-      <select id="editKategori">
-        <option value="">-- Pilih --</option>
-        <option>Oli</option><option>Spare Part</option><option>Aksesoris</option>
-        <option>Ban</option><option>Aki</option><option>Lainnya</option>
-      </select>
+      <select id="editKategori"><option value="">-- Pilih --</option><option>Oli</option><option>Spare Part</option><option>Aksesoris</option><option>Ban</option><option>Aki</option><option>Lainnya</option></select>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Harga Modal</label><input type="text" id="editHargaModal" oninput="rpPreview(this,'editPrevModal')"><div class="rp-preview" id="editPrevModal"></div></div>
@@ -384,20 +303,46 @@
   </div>
 </div>
 
+<!-- ══ MODAL HUTANG ══ -->
+<div class="modal-overlay" id="modalHutang">
+  <div class="modal" style="max-width:600px">
+    <h2>💳 Hutang Pelanggan</h2>
+    <div style="background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:var(--text2)">Total Belum Lunas:</span>
+      <span id="totalHutangBelum" style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:800;color:var(--red)">Rp 0</span>
+    </div>
+    <!-- Form tambah hutang -->
+    <div style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div class="form-label" style="margin-bottom:10px">+ Catat Hutang Baru</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nama Pelanggan</label><input type="text" id="hutangNama" placeholder="Nama pelanggan..."></div>
+        <div class="form-group"><label class="form-label">Jumlah Hutang</label><input type="text" id="hutangJumlah" placeholder="0" oninput="rpPreview(this,'prevHutangJumlah')"><div class="rp-preview" id="prevHutangJumlah"></div></div>
+      </div>
+      <div class="form-group"><label class="form-label">Keterangan</label><input type="text" id="hutangKet" placeholder="Keterangan hutang..."></div>
+      <button class="btn btn-primary btn-full" onclick="tambahHutang()">+ Catat Hutang</button>
+    </div>
+    <!-- Filter & list -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input type="text" id="searchHutang" placeholder="🔍 Cari nama..." oninput="renderHutang()" style="flex:1">
+      <select id="filterHutangStatus" onchange="renderHutang()" style="width:130px">
+        <option value="">Semua Status</option>
+        <option value="belum">Belum Lunas</option>
+        <option value="lunas">Lunas</option>
+      </select>
+    </div>
+    <div class="tbl-wrap"><table><thead><tr><th>Nama</th><th>Jumlah</th><th>Tanggal</th><th>Status</th><th>Aksi</th></tr></thead><tbody id="hutangList"></tbody></table></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="tutupModal('modalHutang')">Tutup</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL GOOGLE SHEETS ══ -->
 <div class="modal-overlay" id="modalSheets">
   <div class="modal">
     <h2>🔗 Hubungkan Google Sheets</h2>
-    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">Masukkan URL Google Apps Script Web App untuk sinkronisasi transaksi & laporan ke Google Sheets.</p>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">Masukkan URL Google Apps Script untuk sinkronisasi data ke Google Sheets.</p>
     <div class="form-group"><label class="form-label">Apps Script URL</label><input type="text" id="sheetsUrl" placeholder="https://script.google.com/macros/s/..."></div>
-    <div style="background:var(--bg);border-radius:8px;padding:12px;font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.8">
-      <strong style="color:var(--text)">📌 Cara mendapatkan URL:</strong><br>
-      1. Buka <strong>script.google.com</strong><br>
-      2. Buat project → paste kode Apps Script<br>
-      3. Deploy → New Deployment → Web App<br>
-      4. Set akses: <em>"Anyone"</em> → Deploy<br>
-      5. Copy URL dan paste di sini
-    </div>
     <div id="sheetsTestStatus" class="sync-status"></div>
     <div class="modal-footer">
       <button class="btn btn-success" onclick="simpanSheetsUrl()">💾 Simpan</button>
@@ -407,16 +352,12 @@
   </div>
 </div>
 
-</div><!-- end #appContent -->
+</div><!-- end appContent -->
 
-<!-- ══ SCRIPTS ══ -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="js/app.js"></script>
-
-<!-- Firebase Cloud Sync -->
 <script type="module" src="js/firebase.js"></script>
-
 </body>
 </html>
