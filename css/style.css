@@ -198,6 +198,7 @@ body {
 .chart-wrap {
   background: var(--bg2); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px; margin-bottom: 16px;
+  max-height: 220px; overflow: hidden;
 }
 .chart-title {
   font-size: 13px; font-weight: 600; margin-bottom: 12px;
