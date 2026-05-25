@@ -276,6 +276,7 @@ window.bukaLoginFirebase = function() {
 };
 
 /* ── AUTO AUTH STATE ── */
+let _authInitialized = false;
 onAuthStateChanged(auth, async (user) => {
   const btn = document.getElementById('btnCloudLogin');
   if (user) {
