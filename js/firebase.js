@@ -4,7 +4,7 @@
 ══════════════════════════════════════════ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getDatabase, ref, set, get, onValue, off } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -102,6 +102,8 @@ function fbErrMsg(code) {
     'auth/too-many-requests':      'Terlalu banyak percobaan, coba lagi nanti',
     'auth/network-request-failed': 'Tidak ada koneksi internet',
     'auth/invalid-credential':     'Email atau password salah',
+    'auth/email-already-in-use': 'Email sudah terdaftar, silakan login',
+    'auth/weak-password':        'Password minimal 6 karakter',
   };
   return map[code] || 'Error: ' + code;
 }
@@ -315,7 +317,17 @@ onAuthStateChanged(auth, async (user) => {
     }
   }
 });
-
+/* ── REGISTER ── */
+window.fbRegister = async function(email, password) {
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    window.FB.uid = cred.user.uid;
+    window.FB.isOnline = true;
+    return { ok: true, user: cred.user };
+  } catch(e) {
+    return { ok: false, error: fbErrMsg(e.code) };
+  }
+};
 /* ── INJECT TOMBOL CLOUD + PATCH simpanData() ── */
 // Dipanggil dari initApp() di app.js setelah PIN berhasil
 window.injectCloudButton = function() {
