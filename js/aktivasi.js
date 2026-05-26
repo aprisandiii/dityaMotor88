@@ -46,13 +46,20 @@ const TIER_CONFIG = {
   },
 };
 
-// ── SIMPAN / BACA LICENSE ─────────────────────────────────────
+// ── SIMPAN / BACA LICENSE (terikat ke uid Firebase) ──────────
+function _licenseKey() {
+  // Key unik per akun — beda akun = beda lisensi
+  const uid = (window.FB && window.FB.uid)
+    || (window.FB && window.FB.auth && window.FB.auth.currentUser && window.FB.auth.currentUser.uid)
+    || 'guest';
+  return 'mk_license_' + uid;
+}
 function getLicense() {
-  try { return JSON.parse(localStorage.getItem('mk_license')) || { tier: TIER.STARTER, kode: null, aktifSejak: null }; }
+  try { return JSON.parse(localStorage.getItem(_licenseKey())) || { tier: TIER.STARTER, kode: null, aktifSejak: null }; }
   catch { return { tier: TIER.STARTER, kode: null, aktifSejak: null }; }
 }
 function setLicense(obj) {
-  localStorage.setItem('mk_license', JSON.stringify(obj));
+  localStorage.setItem(_licenseKey(), JSON.stringify(obj));
 }
 
 // ── GENERATOR HASH (djb2 sederhana) ──────────────────────────
