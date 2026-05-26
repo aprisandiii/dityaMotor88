@@ -66,6 +66,9 @@ window.updateDashboard = function() { renderDashboard(); };
 
 // ===== INIT =====
 window.addEventListener('load', () => {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('pin-screen').style.display  = 'none';
+
   const s = getData('settings', {});
   if (s.nama) document.getElementById('pin-store-name').textContent = s.nama;
   if (s.alamat) document.getElementById('pin-store-addr').textContent = s.alamat;
@@ -886,4 +889,52 @@ function toast(msg, type = '') {
   el.textContent = msg;
   el.className = 'toast show ' + type;
   setTimeout(() => el.className = 'toast', 2500);
+}
+
+// ===== AUTH =====
+function authTab(tab) {
+  document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none';
+  document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('reg-error').textContent   = '';
+}
+
+async function doLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl    = document.getElementById('login-error');
+  if (!email || !password) { errEl.textContent = 'Email & password wajib diisi'; return; }
+  errEl.textContent = 'Memproses...';
+  const result = await window.fbLogin(email, password);
+  if (result.ok) {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('pin-screen').style.display  = 'flex';
+  } else {
+    errEl.textContent = result.error;
+  }
+}
+
+async function doRegister() {
+  const nama     = document.getElementById('reg-nama').value.trim();
+  const email    = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const errEl    = document.getElementById('reg-error');
+  if (!nama)     { errEl.textContent = 'Nama toko wajib diisi'; return; }
+  if (!email)    { errEl.textContent = 'Email wajib diisi'; return; }
+  if (!password) { errEl.textContent = 'Password wajib diisi'; return; }
+  errEl.textContent = 'Mendaftarkan...';
+  const result = await window.fbRegister(email, password);
+  if (result.ok) {
+    const s = { nama, footer1: 'Terima kasih telah berbelanja!', footer2: '' };
+    setData('settings', s);
+    await window.fbSimpanSemua();
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('pin-screen').style.display  = 'flex';
+    document.getElementById('pin-store-name').textContent = nama;
+    toast('Akun berhasil dibuat! Selamat datang 🎉', 'success');
+  } else {
+    errEl.textContent = result.error;
+  }
 }
