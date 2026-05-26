@@ -515,7 +515,12 @@ function checkout() {
   laporan[tgl].omzet += total;
   laporan[tgl].laba += trx.laba;
   laporan[tgl].trx++;
-  cart.forEach(c => { laporan[tgl].terlaris[c.nama] = (laporan[tgl].terlaris[c.nama] || 0) + c.qty; });
+  cart.forEach(c => {
+    // Gunakan key aman untuk Firebase (tanpa spasi & karakter terlarang)
+    const safeKey = c.nama.replace(/[.#$\/\[\]\s]/g, '_');
+    if (!laporan[tgl].terlaris[safeKey]) laporan[tgl].terlaris[safeKey] = { nama: c.nama, qty: 0 };
+    laporan[tgl].terlaris[safeKey].qty += c.qty;
+  });
   setData('laporan', laporan);
 
   lastNota = generateNota(trx);
@@ -650,7 +655,10 @@ function renderTerlaris() {
       const parts = tgl.split('/');
       if (parts.length === 3) d = new Date(parts[2], parts[1] - 1, parts[0]);
     if (d && d.getMonth() === bulan && d.getFullYear() === tahun) {
-      Object.entries(data.terlaris || {}).forEach(([nama, qty]) => {
+      Object.entries(data.terlaris || {}).forEach(([key, val]) => {
+        // Support format baru {nama, qty} dan format lama angka langsung
+        const nama = (typeof val === 'object') ? val.nama : key.replace(/_/g, ' ');
+        const qty  = (typeof val === 'object') ? val.qty  : val;
         totalTerjual[nama] = (totalTerjual[nama] || 0) + qty;
       });
     }
@@ -694,7 +702,10 @@ function renderLaporan() {
     return;
   }
   tbody.innerHTML = entries.map(e => {
-    const terlaris = Object.entries(e.terlaris || {}).sort((a, b) => b[1] - a[1])[0];
+    const terlarisEntries = Object.entries(e.terlaris || {});
+    const terlaris = terlarisEntries
+      .map(([k, v]) => [(typeof v === 'object') ? v.nama : k.replace(/_/g,' '), (typeof v === 'object') ? v.qty : v])
+      .sort((a, b) => b[1] - a[1])[0];
     return `<tr>
       <td>${e.tgl}</td>
       <td style="color:var(--accent)">${fmtRpShort(e.omzet)}</td>
