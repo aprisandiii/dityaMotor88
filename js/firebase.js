@@ -4,7 +4,7 @@
 ══════════════════════════════════════════ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getDatabase, ref, set, get, onValue, off } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -21,7 +21,7 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const rtdb = getDatabase(app);
 
-window.FB = { auth, rtdb, uid: null, isOnline: false, listeners: {} };
+window.FB = { auth, rtdb, uid: null, email: null, isOnline: false, listeners: {} };
 
 /* ── INTERNAL FLAGS ── */
 let _isSaving       = false;
@@ -44,22 +44,26 @@ function tokoRef(path) {
   return ref(rtdb, `toko/${window.FB.uid}/${path}`);
 }
 
-/* ── HELPER: panggil fungsi sync yang aman (tidak rekursi) ── */
+/* ── BERSIHKAN LOCALSTORAGE DATA (bukan settings/pin) ── */
+function clearLocalData() {
+  localStorage.removeItem('produk');
+  localStorage.removeItem('laporan');
+  localStorage.removeItem('riwayat');
+  // Reset window state
+  window.produk  = [];
+  window.laporan = {};
+  window.riwayat = [];
+}
+
+/* ── HELPER: panggil fungsi sync yang aman ── */
 function syncProduk() {
-  // Gunakan nama baru dari app.js yang sudah diperbaiki
-  if (typeof window.syncProdukDariFirebase === 'function') {
-    window.syncProdukDariFirebase();
-  }
+  if (typeof window.syncProdukDariFirebase === 'function') window.syncProdukDariFirebase();
 }
 function syncLaporan() {
-  if (typeof window.syncLaporanDariFirebase === 'function') {
-    window.syncLaporanDariFirebase();
-  }
+  if (typeof window.syncLaporanDariFirebase === 'function') window.syncLaporanDariFirebase();
 }
 function syncRiwayat() {
-  if (typeof window.syncRiwayatDariFirebase === 'function') {
-    window.syncRiwayatDariFirebase();
-  }
+  if (typeof window.syncRiwayatDariFirebase === 'function') window.syncRiwayatDariFirebase();
 }
 
 /* ── SYNC BADGE ── */
@@ -102,8 +106,8 @@ function fbErrMsg(code) {
     'auth/too-many-requests':      'Terlalu banyak percobaan, coba lagi nanti',
     'auth/network-request-failed': 'Tidak ada koneksi internet',
     'auth/invalid-credential':     'Email atau password salah',
-    'auth/email-already-in-use': 'Email sudah terdaftar, silakan login',
-    'auth/weak-password':        'Password minimal 6 karakter',
+    'auth/email-already-in-use':   'Email sudah terdaftar, silakan login',
+    'auth/weak-password':          'Password minimal 6 karakter',
   };
   return map[code] || 'Error: ' + code;
 }
@@ -112,7 +116,8 @@ function fbErrMsg(code) {
 window.fbLogin = async function(email, password) {
   try {
     const cred = await signInWithEmailAndPassword(auth, email, password);
-    window.FB.uid = cred.user.uid;
+    window.FB.uid    = cred.user.uid;
+    window.FB.email  = cred.user.email;   // ← simpan email
     window.FB.isOnline = true;
     return { ok: true, user: cred.user };
   } catch(e) {
@@ -122,7 +127,6 @@ window.fbLogin = async function(email, password) {
 
 window.fbResetPassword = async function(email) {
   try {
-    const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
     await sendPasswordResetEmail(auth, email);
     return { ok: true };
   } catch(e) {
@@ -131,11 +135,20 @@ window.fbResetPassword = async function(email) {
 };
 
 window.fbLogout = async function() {
+  // Hentikan semua listener realtime
   Object.values(window.FB.listeners).forEach(r => off(r));
   window.FB.listeners = {};
-  window.FB.uid       = null;
-  window.FB.isOnline  = false;
-  _lastSavedHash      = '';
+
+  // ✅ BERSIHKAN data akun lama dari localStorage & memory
+  clearLocalData();
+  localStorage.removeItem('settings');
+  localStorage.removeItem('prefs');
+  localStorage.removeItem('pin');
+
+  window.FB.uid      = null;
+  window.FB.email    = null;
+  window.FB.isOnline = false;
+  _lastSavedHash     = '';
   showSyncBadge('offline');
   await signOut(auth);
 };
@@ -145,27 +158,49 @@ window.fbLoadAllData = async function() {
   if (!window.FB.uid || _isLoadingCloud) return;
   _isLoadingCloud = true;
   showSyncBadge('syncing');
+
+  // ✅ BERSIHKAN data lama sebelum load data akun baru
+  clearLocalData();
+
   try {
     const snap = await get(tokoRef('data'));
     if (snap.exists()) {
       const data = snap.val();
-      if (data.produk)     { window.produk  = data.produk;  syncProduk(); }
-      if (data.laporan)    { window.laporan = data.laporan; syncLaporan(); }
-      if (data.riwayat)    { window.riwayat = data.riwayat; syncRiwayat(); }
+      if (data.produk)  {
+        window.produk  = data.produk;
+        localStorage.setItem('produk', JSON.stringify(data.produk));
+        syncProduk();
+      }
+      if (data.laporan) {
+        window.laporan = data.laporan;
+        localStorage.setItem('laporan', JSON.stringify(data.laporan));
+        syncLaporan();
+      }
+      if (data.riwayat) {
+        window.riwayat = data.riwayat;
+        localStorage.setItem('riwayat', JSON.stringify(data.riwayat));
+        syncRiwayat();
+      }
       if (data.statistik)  window.statistikProduk = data.statistik;
       if (data.pengaturan) {
         window.pengaturan = { ...window.pengaturan, ...data.pengaturan };
+        localStorage.setItem('settings', JSON.stringify(window.pengaturan));
         if (typeof window.terapkanPengaturan === 'function') window.terapkanPengaturan();
       }
+    } else {
+      // Akun baru — tidak ada data di Firebase, pastikan tampil kosong
+      syncProduk();
+      syncLaporan();
+      syncRiwayat();
     }
+
     if (typeof window.updateDashboard === 'function') window.updateDashboard();
+    if (typeof window.renderBadgeTier === 'function') window.renderBadgeTier();
     _lastSavedHash = dataHash();
     showSyncBadge('synced');
-    if (typeof window.showToast === 'function') window.showToast('✅ Data cloud berhasil dimuat!', 'success');
   } catch(e) {
     console.error('fbLoadAllData:', e);
     showSyncBadge('error');
-    if (typeof window.showToast === 'function') window.showToast('⚠️ Gagal muat data: ' + e.message, 'error');
   } finally {
     _isLoadingCloud = false;
   }
@@ -190,23 +225,27 @@ window.fbListenRealtime = function() {
 
     if (data.produk && JSON.stringify(data.produk) !== JSON.stringify(window.produk)) {
       window.produk = data.produk;
+      localStorage.setItem('produk', JSON.stringify(data.produk));
       syncProduk();
       if (typeof window.updateDashboard === 'function') window.updateDashboard();
       berubah = true;
     }
     if (data.laporan && JSON.stringify(data.laporan) !== JSON.stringify(window.laporan)) {
       window.laporan = data.laporan;
+      localStorage.setItem('laporan', JSON.stringify(data.laporan));
       syncLaporan();
       if (typeof window.updateDashboard === 'function') window.updateDashboard();
       berubah = true;
     }
     if (data.riwayat && JSON.stringify(data.riwayat) !== JSON.stringify(window.riwayat)) {
       window.riwayat = data.riwayat;
+      localStorage.setItem('riwayat', JSON.stringify(data.riwayat));
       syncRiwayat();
       berubah = true;
     }
     if (data.pengaturan && JSON.stringify(data.pengaturan) !== JSON.stringify(window.pengaturan)) {
       window.pengaturan = { ...window.pengaturan, ...data.pengaturan };
+      localStorage.setItem('settings', JSON.stringify(window.pengaturan));
       if (typeof window.terapkanPengaturan === 'function') window.terapkanPengaturan();
       berubah = true;
     }
@@ -233,7 +272,7 @@ window.fbSimpanSemua = async function() {
   try {
     await set(tokoRef('data'), {
       produk:     window.produk          || [],
-      laporan:    window.laporan         || [],
+      laporan:    window.laporan         || {},
       riwayat:    window.riwayat         || [],
       statistik:  window.statistikProduk || {},
       pengaturan: window.pengaturan      || {},
@@ -252,7 +291,7 @@ window.fbSimpanSemua = async function() {
 /* ── MODAL LOGIN CLOUD ── */
 window.bukaLoginFirebase = function() {
   if (!window.Swal) {
-    alert('Library Swal belum dimuat. Pastikan SweetAlert2 di-import di index.html');
+    alert('Library Swal belum dimuat.');
     return;
   }
 
@@ -304,7 +343,8 @@ window.bukaLoginFirebase = function() {
 onAuthStateChanged(auth, async (user) => {
   const btn = document.getElementById('btnCloudLogin');
   if (user) {
-    window.FB.uid      = user.uid;
+    window.FB.uid    = user.uid;
+    window.FB.email  = user.email;    // ← simpan email di sini juga
     window.FB.isOnline = true;
     showSyncBadge('online');
     await window.fbLoadAllData();
@@ -317,6 +357,7 @@ onAuthStateChanged(auth, async (user) => {
     }
   } else {
     window.FB.uid      = null;
+    window.FB.email    = null;
     window.FB.isOnline = false;
     showSyncBadge('offline');
     if (btn) {
@@ -327,19 +368,21 @@ onAuthStateChanged(auth, async (user) => {
     }
   }
 });
+
 /* ── REGISTER ── */
 window.fbRegister = async function(email, password) {
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    window.FB.uid = cred.user.uid;
+    window.FB.uid   = cred.user.uid;
+    window.FB.email = cred.user.email;
     window.FB.isOnline = true;
     return { ok: true, user: cred.user };
   } catch(e) {
     return { ok: false, error: fbErrMsg(e.code) };
   }
 };
-/* ── INJECT TOMBOL CLOUD + PATCH simpanData() ── */
-// Dipanggil dari initApp() di app.js setelah PIN berhasil
+
+/* ── INJECT TOMBOL CLOUD ── */
 window.injectCloudButton = function() {
   const topbarActions = document.querySelector('.header-actions');
   if (topbarActions && !document.getElementById('btnCloudLogin')) {
@@ -352,7 +395,6 @@ window.injectCloudButton = function() {
     topbarActions.insertBefore(btn, topbarActions.lastElementChild);
   }
 
-  // Patch simpanData() supaya auto-sync ke Firebase setiap ada perubahan
   const ori = window.simpanData;
   if (typeof ori === 'function' && !ori._patched) {
     window.simpanData = function() {
