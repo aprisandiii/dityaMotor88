@@ -509,7 +509,7 @@ function checkout() {
   riwayat.unshift(trx);
   setData('riwayat', riwayat);
 
-  const tgl = now.toLocaleDateString('id-ID');
+  const tgl = tglKey(now); // format YYYY-MM-DD (aman untuk Firebase key)
   const laporan = getData('laporan', {});
   if (!laporan[tgl]) laporan[tgl] = { omzet: 0, laba: 0, trx: 0, terlaris: {} };
   laporan[tgl].omzet += total;
@@ -578,7 +578,7 @@ async function shareNota() {
 // ===== DASHBOARD =====
 function renderDashboard() {
   const laporan = getData('laporan', {});
-  const tgl = new Date().toLocaleDateString('id-ID');
+  const tgl = tglKey(); // YYYY-MM-DD
   const hari = laporan[tgl] || { omzet: 0, laba: 0, trx: 0 };
   document.getElementById('stat-omzet').textContent = fmtRpShort(hari.omzet);
   document.getElementById('stat-laba').textContent = fmtRpShort(hari.laba);
@@ -610,7 +610,7 @@ function renderChart() {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(Date.now() - i * 24 * 3600 * 1000);
     days.push(d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }));
-    const tgl = d.toLocaleDateString('id-ID');
+    const tgl = tglKey(d); // YYYY-MM-DD
     omzetData.push(laporan[tgl]?.omzet || 0);
     labaData.push(laporan[tgl]?.laba || 0);
   }
@@ -642,14 +642,17 @@ function renderTerlaris() {
   const bulan = now.getMonth(), tahun = now.getFullYear();
   const totalTerjual = {};
   Object.entries(laporan).forEach(([tgl, data]) => {
-    const parts = tgl.split('/');
-    if (parts.length === 3) {
-      const d = new Date(parts[2], parts[1] - 1, parts[0]);
-      if (d.getMonth() === bulan && d.getFullYear() === tahun) {
-        Object.entries(data.terlaris || {}).forEach(([nama, qty]) => {
-          totalTerjual[nama] = (totalTerjual[nama] || 0) + qty;
-        });
-      }
+    // Support both format lama (DD/M/YYYY) dan format baru (YYYY-MM-DD)
+    let d;
+    if (tgl.includes('-')) {
+      d = new Date(tgl); // format baru YYYY-MM-DD
+    } else {
+      const parts = tgl.split('/');
+      if (parts.length === 3) d = new Date(parts[2], parts[1] - 1, parts[0]);
+    if (d && d.getMonth() === bulan && d.getFullYear() === tahun) {
+      Object.entries(data.terlaris || {}).forEach(([nama, qty]) => {
+        totalTerjual[nama] = (totalTerjual[nama] || 0) + qty;
+      });
     }
   });
   const sorted = Object.entries(totalTerjual).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -671,9 +674,17 @@ function renderLaporan() {
   const dari = document.getElementById('date-dari').value;
   const sampai = document.getElementById('date-sampai').value;
   const entries = Object.entries(laporan).map(([tgl, data]) => {
-    const parts = tgl.split('/');
-    const iso = parts.length === 3 ? `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}` : '';
-    return { tgl, iso, ...data };
+    // Support format lama DD/M/YYYY dan format baru YYYY-MM-DD
+    let iso, display;
+    if (tgl.includes('-')) {
+      iso = tgl; // sudah YYYY-MM-DD
+      display = tglDisplay(tgl); // tampilkan DD/M/YYYY
+    } else {
+      const parts = tgl.split('/');
+      iso = parts.length === 3 ? `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}` : '';
+      display = tgl;
+    }
+    return { tgl: display, iso, ...data };
   }).filter(e => (!dari || e.iso >= dari) && (!sampai || e.iso <= sampai))
     .sort((a, b) => b.iso.localeCompare(a.iso));
 
@@ -839,6 +850,18 @@ function resetAllData() {
 }
 
 // ===== UTILS =====
+// Format tanggal aman untuk Firebase key (tidak boleh ada "/")
+// Gunakan YYYY-MM-DD sebagai key, tampilkan DD/MM/YYYY di UI
+function tglKey(date) {
+  const d = date || new Date();
+  return d.toISOString().split('T')[0]; // "2026-05-26"
+}
+function tglDisplay(isoKey) {
+  // "2026-05-26" → "26/5/2026"
+  const [y, m, dd] = isoKey.split('-');
+  return `${parseInt(dd)}/${parseInt(m)}/${y}`;
+}
+
 function fmtRp(n) { return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID'); }
 function fmtRpShort(n) {
   n = Math.round(n || 0);
