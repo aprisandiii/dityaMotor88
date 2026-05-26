@@ -40,9 +40,21 @@ window.riwayat   = getData('riwayat', []);
 window.pengaturan = getData('settings', {});
 
 // Fungsi render yang bisa dipanggil Firebase
-window.renderProduk  = function() { renderProduk(); };
-window.renderLaporan = function() { renderLaporan(); renderRiwayat(); };
-window.renderRiwayat = function() { renderRiwayat(); };
+window.renderProduk  = function() {
+  const produk = window.produk || [];
+  if (produk.length) localStorage.setItem('produk', JSON.stringify(produk));
+  renderProduk();
+};
+window.renderLaporan = function() {
+  const laporan = window.laporan || {};
+  if (Object.keys(laporan).length) localStorage.setItem('laporan', JSON.stringify(laporan));
+  renderLaporan(); renderRiwayat();
+};
+window.renderRiwayat = function() {
+  const riwayat = window.riwayat || [];
+  if (riwayat.length) localStorage.setItem('riwayat', JSON.stringify(riwayat));
+  renderRiwayat();
+};
 window.updateDashboard = function() { renderDashboard(); };
 
 // ===== INIT =====
