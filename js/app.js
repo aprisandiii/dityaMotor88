@@ -66,9 +66,8 @@ window.updateDashboard = function() { renderDashboard(); };
 
 // ===== INIT =====
 window.addEventListener('load', () => {
-  // Sembunyikan semua screen dulu, biarkan onAuthStateChanged yang handle
   document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('pin-screen').style.display  = 'none';
+  document.getElementById('pin-screen').style.display  = 'flex';
 
   const s = getData('settings', {});
   if (s.nama) document.getElementById('pin-store-name').textContent = s.nama;
