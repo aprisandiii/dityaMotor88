@@ -1,7 +1,7 @@
 {
-  "name": "dityaMotor 88 — Kasir Digital",
-  "short_name": "dityaMotor",
-  "description": "Aplikasi kasir digital untuk bengkel motor",
+  "name": "MotoKas — Kasir Digital",
+  "short_name": "MotoKas",
+  "description": "Sistem kasir pintar khusus bengkel & toko motor",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f1117",
