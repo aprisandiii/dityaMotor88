@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════
    dityaMotor 88 — Firebase Integration v2
-   firebase.js — Fixed Realtime Sync
+   firebase.js — Fixed  Realtime Sync
 ══════════════════════════════════════════ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
