@@ -44,6 +44,24 @@ function tokoRef(path) {
   return ref(rtdb, `toko/${window.FB.uid}/${path}`);
 }
 
+/* ── HELPER: panggil fungsi sync yang aman (tidak rekursi) ── */
+function syncProduk() {
+  // Gunakan nama baru dari app.js yang sudah diperbaiki
+  if (typeof window.syncProdukDariFirebase === 'function') {
+    window.syncProdukDariFirebase();
+  }
+}
+function syncLaporan() {
+  if (typeof window.syncLaporanDariFirebase === 'function') {
+    window.syncLaporanDariFirebase();
+  }
+}
+function syncRiwayat() {
+  if (typeof window.syncRiwayatDariFirebase === 'function') {
+    window.syncRiwayatDariFirebase();
+  }
+}
+
 /* ── SYNC BADGE ── */
 let _badgeTimeout;
 function showSyncBadge(status) {
@@ -119,9 +137,9 @@ window.fbLoadAllData = async function() {
     const snap = await get(tokoRef('data'));
     if (snap.exists()) {
       const data = snap.val();
-      if (data.produk)     { window.produk    = data.produk;     if (typeof window.renderProduk  === 'function') window.renderProduk(); }
-      if (data.laporan)    { window.laporan   = data.laporan;    if (typeof window.renderLaporan === 'function') window.renderLaporan(); }
-      if (data.riwayat)    { window.riwayat   = data.riwayat;    if (typeof window.renderRiwayat === 'function') window.renderRiwayat(); }
+      if (data.produk)     { window.produk  = data.produk;  syncProduk(); }
+      if (data.laporan)    { window.laporan = data.laporan; syncLaporan(); }
+      if (data.riwayat)    { window.riwayat = data.riwayat; syncRiwayat(); }
       if (data.statistik)  window.statistikProduk = data.statistik;
       if (data.pengaturan) {
         window.pengaturan = { ...window.pengaturan, ...data.pengaturan };
@@ -160,19 +178,19 @@ window.fbListenRealtime = function() {
 
     if (data.produk && JSON.stringify(data.produk) !== JSON.stringify(window.produk)) {
       window.produk = data.produk;
-      if (typeof window.renderProduk    === 'function') window.renderProduk();
+      syncProduk();
       if (typeof window.updateDashboard === 'function') window.updateDashboard();
       berubah = true;
     }
     if (data.laporan && JSON.stringify(data.laporan) !== JSON.stringify(window.laporan)) {
       window.laporan = data.laporan;
-      if (typeof window.renderLaporan   === 'function') window.renderLaporan();
+      syncLaporan();
       if (typeof window.updateDashboard === 'function') window.updateDashboard();
       berubah = true;
     }
     if (data.riwayat && JSON.stringify(data.riwayat) !== JSON.stringify(window.riwayat)) {
       window.riwayat = data.riwayat;
-      if (typeof window.renderRiwayat   === 'function') window.renderRiwayat();
+      syncRiwayat();
       berubah = true;
     }
     if (data.pengaturan && JSON.stringify(data.pengaturan) !== JSON.stringify(window.pengaturan)) {
