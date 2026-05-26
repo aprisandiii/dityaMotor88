@@ -339,16 +339,28 @@ window.bukaLoginFirebase = function() {
   });
 };
 
+/* ── HELPER: cek apakah app sudah melewati PIN (sudah di dalam app) ── */
+function isAppActive() {
+  const app = document.getElementById('app');
+  return app && app.style.display !== 'none' && app.style.display !== '';
+}
+
 /* ── AUTO AUTH STATE ── */
 onAuthStateChanged(auth, async (user) => {
   const btn = document.getElementById('btnCloudLogin');
   if (user) {
-    window.FB.uid    = user.uid;
-    window.FB.email  = user.email;    // ← simpan email di sini juga
+    window.FB.uid      = user.uid;
+    window.FB.email    = user.email;
     window.FB.isOnline = true;
-    showSyncBadge('online');
-    await window.fbLoadAllData();
-    window.fbListenRealtime();
+
+    // ✅ Hanya load data & tampilkan badge jika app sudah aktif (sudah lewat PIN)
+    // Kalau masih di auth/pin screen, simpan uid dulu — data di-load setelah PIN berhasil
+    if (isAppActive()) {
+      showSyncBadge('online');
+      await window.fbLoadAllData();
+      window.fbListenRealtime();
+    }
+
     if (btn) {
       btn.innerHTML         = `✅ <span class="btn-label">Cloud</span>`;
       btn.style.background  = 'rgba(34,197,94,0.15)';
