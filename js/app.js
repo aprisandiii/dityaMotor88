@@ -112,6 +112,15 @@ function showScreen(name) {
     const resetOverlay = document.getElementById('reset-confirm-overlay');
     if (resetOverlay) resetOverlay.remove();
   }
+
+  // FIX: reset currentPin setiap kali pin-screen tampil
+  // agar sisa PIN dari sesi sebelumnya tidak terbawa ke sesi baru
+  // dan autocomplete browser tidak bisa trigger checkPin secara otomatis
+  if (name === 'pin') {
+    currentPin = '';
+    updatePinDots();
+    showPinStatus('Masukkan PIN');
+  }
 }
 
 // ===== INIT =====
