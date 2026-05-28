@@ -108,7 +108,7 @@ function showScreen(name) {
 
 // ===== INIT =====
 window.addEventListener('load', () => {
-  // Cek apakah user pernah login sebelumnya
+  // FIX: cek apakah user pernah login — kalau belum tampil AUTH, bukan PIN
   const sudahLogin = localStorage.getItem('mk_email');
   if (sudahLogin) {
     showScreen('pin');
@@ -358,7 +358,6 @@ function resetPinPrompt() {
 }
 
 // ===== APP INIT =====
-// FIX: retry loop agar tidak race condition dengan firebase.js ES module
 function initApp() {
   loadSettings();
   renderDashboard();
@@ -367,27 +366,30 @@ function initApp() {
   renderRiwayat();
   if (typeof window.injectCloudButton === 'function') window.injectCloudButton();
 
-  // FIX: tunggu window.FB siap sebelum load data & listen realtime
-  // firebase.js adalah ES module sehingga bisa belum selesai saat initApp jalan
+  // FIX: retry loop — tunggu window.FB.uid siap (diisi oleh onAuthStateChanged)
+  // firebase.js adalah ES module sehingga onAuthStateChanged bisa belum selesai
+  // saat initApp() dipanggil pertama kali setelah PIN berhasil
   let _fbRetry = 0;
   function tryFirebaseLoad() {
-    // Batas retry 10x (3 detik total)
-    if (_fbRetry >= 10) {
-      console.warn('MotoKas: Firebase module tidak siap setelah 3 detik, skip cloud sync.');
+    if (_fbRetry >= 20) {
+      console.warn('MotoKas: Firebase tidak siap setelah 6 detik, skip cloud sync.');
       return;
     }
     _fbRetry++;
 
-    // FB module belum dimuat sama sekali → coba lagi
+    // FB module belum dimuat sama sekali
     if (!window.FB) {
       setTimeout(tryFirebaseLoad, 300);
       return;
     }
 
-    // User belum login → tidak perlu load data cloud
-    if (!window.FB.uid) return;
+    // onAuthStateChanged belum selesai — uid belum terisi
+    if (!window.FB.uid) {
+      setTimeout(tryFirebaseLoad, 300);
+      return;
+    }
 
-    // FB siap & user sudah login → load data lalu aktifkan listener
+    // FB siap & user sudah login → load data lalu aktifkan listener realtime
     if (typeof window.fbLoadAllData === 'function') {
       window.fbLoadAllData().then(() => {
         if (typeof window.fbListenRealtime === 'function') {
@@ -395,7 +397,6 @@ function initApp() {
         }
       });
     } else {
-      // fbLoadAllData belum ter-expose → retry
       setTimeout(tryFirebaseLoad, 300);
     }
   }
@@ -1132,8 +1133,8 @@ function resetAllData() {
   const cancelBtn  = document.getElementById('reset-cancel-btn');
 
   input.addEventListener('input', () => {
-    const valid             = input.value.trim() === 'HAPUS SEMUA';
-    confirmBtn.disabled     = !valid;
+    const valid                 = input.value.trim() === 'HAPUS SEMUA';
+    confirmBtn.disabled         = !valid;
     confirmBtn.style.background = valid ? '#e74c3c' : '#666';
     confirmBtn.style.color      = valid ? '#fff'    : '#aaa';
     confirmBtn.style.cursor     = valid ? 'pointer' : 'not-allowed';
