@@ -25,28 +25,27 @@
 
     <!-- Tab -->
     <div class="auth-tabs">
-      <button class="auth-tab active" id="tab-login" onclick="authTab('login')">Masuk</button>
-      <button class="auth-tab" id="tab-register" onclick="authTab('register')">Daftar</button>
+      <button class="auth-tab active" id="tab-login"    onclick="authTab('login')">Masuk</button>
+      <button class="auth-tab"        id="tab-register" onclick="authTab('register')">Daftar</button>
     </div>
 
     <!-- Form Login -->
     <div id="form-login">
-      <input class="auth-input" id="login-email" type="email" placeholder="Email" autocomplete="email">
+      <input class="auth-input" id="login-email"    type="email"    placeholder="Email"    autocomplete="email">
       <input class="auth-input" id="login-password" type="password" placeholder="Password" autocomplete="current-password">
       <div class="auth-error" id="login-error"></div>
       <button class="auth-btn" onclick="doLogin()">🔑 Masuk</button>
-      <!-- FIX #2: pindah ke dalam auth-wrap, tepat di bawah form login -->
-      <p class="auth-hint">
-        Lupa password?
-        <span onclick="lupaPassword()">Kirim email reset</span>
-      </p>
     </div>
+    <p class="auth-hint">
+      Lupa password?
+      <span onclick="lupaPassword()">Kirim email reset</span>
+    </p>
 
     <!-- Form Register -->
     <div id="form-register" style="display:none">
-      <input class="auth-input" id="reg-nama" type="text" placeholder="Nama Toko" autocomplete="off">
-      <input class="auth-input" id="reg-email" type="email" placeholder="Email" autocomplete="email">
-      <input class="auth-input" id="reg-password" type="password" placeholder="Password (min. 6 karakter)" autocomplete="new-password">
+      <input class="auth-input" id="reg-nama"     type="text"     placeholder="Nama Toko"                   autocomplete="off">
+      <input class="auth-input" id="reg-email"    type="email"    placeholder="Email"                       autocomplete="email">
+      <input class="auth-input" id="reg-password" type="password" placeholder="Password (min. 6 karakter)"  autocomplete="new-password">
       <div class="auth-error" id="reg-error"></div>
       <button class="auth-btn" onclick="doRegister()">📝 Daftar Sekarang</button>
     </div>
@@ -58,9 +57,9 @@
 <!-- PIN Screen -->
 <div id="pin-screen">
   <div class="pin-logo">
-   <div class="pin-icon-wrap">
-  <img src="icons/icon-512.png" alt="MotoKas" style="width:90px;height:90px;border-radius:20px;">
-</div>
+    <div class="pin-icon-wrap">
+      <img src="icons/icon-512.png" alt="MotoKas" style="width:90px;height:90px;border-radius:20px;">
+    </div>
     <h1 id="pin-store-name">Nama Toko</h1>
     <p id="pin-store-addr">Masukkan PIN untuk membuka kasir</p>
   </div>
@@ -82,7 +81,7 @@
     <button class="pin-btn" onclick="pinInput('8')">8</button>
     <button class="pin-btn" onclick="pinInput('9')">9</button>
     <button class="pin-btn pin-zero" onclick="pinInput('0')">0</button>
-    <button class="pin-btn pin-del" onclick="pinDel()">⌫</button>
+    <button class="pin-btn pin-del"  onclick="pinDel()">⌫</button>
   </div>
   <p class="pin-hint">Lupa PIN? <span onclick="resetPinPrompt()">Reset via kode rahasia</span></p>
 </div>
@@ -90,8 +89,8 @@
 <!-- Install Banner -->
 <div id="install-banner">
   <p>📱 Install sebagai aplikasi di perangkat Anda</p>
-  <button class="btn-install" onclick="installPWA()">Install</button>
-  <button class="btn-close-banner" onclick="document.getElementById('install-banner').style.display='none'">✕</button>
+  <button class="btn-install"       onclick="installPWA()">Install</button>
+  <button class="btn-close-banner"  onclick="document.getElementById('install-banner').style.display='none'">✕</button>
 </div>
 
 <!-- Toast -->
@@ -103,17 +102,17 @@
   <div class="app-header">
     <div class="header-left">
       <div class="header-logo">
-  <img src="icons/icon-512.png" alt="MotoKas" style="width:36px;height:36px;border-radius:8px;">
-</div>
+        <img src="icons/icon-512.png" alt="MotoKas" style="width:36px;height:36px;border-radius:8px;">
+      </div>
       <div>
         <div class="header-title" id="hdr-name">Nama Toko</div>
-        <div class="header-sub" id="hdr-sub">v4.0 Pro</div>
+        <div class="header-sub"   id="hdr-sub">v4.0 Pro</div>
       </div>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" title="Ganti PIN" onclick="openModal('modal-pin')">🔑</button>
-      <button class="icon-btn" title="Logout Akun" onclick="logoutAkun()">🚪</button>
-      <button class="icon-btn" title="Kunci Aplikasi" onclick="lockApp()">🔒</button>
+      <button class="icon-btn" title="Ganti PIN"       onclick="openModal('modal-pin')">🔑</button>
+      <button class="icon-btn" title="Logout Akun"     onclick="logoutAkun()">🚪</button>
+      <button class="icon-btn" title="Kunci Aplikasi"  onclick="lockApp()">🔒</button>
     </div>
   </div>
 
@@ -159,20 +158,20 @@
       <div class="empty-state"><div class="empty-icon">📦</div>Belum ada data penjualan</div>
     </div>
   </div>
- 
+
   <div id="page-produk" class="page">
     <div class="search-bar">
       <span class="search-icon">🔍</span>
       <input type="text" id="search-produk" placeholder="Cari produk atau SKU..." oninput="renderProduk()">
     </div>
     <div class="filter-scroll" id="filter-cat">
-      <span class="filter-chip active" data-cat="Semua" onclick="setFilter(this)">Semua</span>
-      <span class="filter-chip" data-cat="Oli" onclick="setFilter(this)">Oli</span>
-      <span class="filter-chip" data-cat="Spare Part" onclick="setFilter(this)">Spare Part</span>
-      <span class="filter-chip" data-cat="Aksesoris" onclick="setFilter(this)">Aksesoris</span>
-      <span class="filter-chip" data-cat="Ban" onclick="setFilter(this)">Ban</span>
-      <span class="filter-chip" data-cat="Aki" onclick="setFilter(this)">Aki</span>
-      <span class="filter-chip" data-cat="Lainnya" onclick="setFilter(this)">Lainnya</span>
+      <span class="filter-chip active" data-cat="Semua"      onclick="setFilter(this)">Semua</span>
+      <span class="filter-chip"        data-cat="Oli"        onclick="setFilter(this)">Oli</span>
+      <span class="filter-chip"        data-cat="Spare Part" onclick="setFilter(this)">Spare Part</span>
+      <span class="filter-chip"        data-cat="Aksesoris"  onclick="setFilter(this)">Aksesoris</span>
+      <span class="filter-chip"        data-cat="Ban"        onclick="setFilter(this)">Ban</span>
+      <span class="filter-chip"        data-cat="Aki"        onclick="setFilter(this)">Aki</span>
+      <span class="filter-chip"        data-cat="Lainnya"    onclick="setFilter(this)">Lainnya</span>
     </div>
     <div class="produk-list" id="produk-list"></div>
     <button class="fab" onclick="openModal('modal-tambah-produk')">＋</button>
@@ -197,8 +196,8 @@
         <div class="diskon-wrap">
           <input type="number" id="diskon-val" placeholder="0" oninput="hitungTotal()" min="0">
           <div class="diskon-toggle">
-            <button class="active" id="diskon-rp" onclick="setDiskonMode('rp')">Rp</button>
-            <button id="diskon-pct" onclick="setDiskonMode('pct')">%</button>
+            <button class="active" id="diskon-rp"  onclick="setDiskonMode('rp')">Rp</button>
+            <button               id="diskon-pct" onclick="setDiskonMode('pct')">%</button>
           </div>
         </div>
       </div>
@@ -215,8 +214,8 @@
       <div class="payment-label">Metode Pembayaran</div>
       <div class="payment-methods">
         <button class="payment-btn active" onclick="setPayment(this,'tunai')">💵 Tunai</button>
-        <button class="payment-btn" onclick="setPayment(this,'transfer')">🏦 Transfer</button>
-        <button class="payment-btn" onclick="setPayment(this,'qris')">📱 QRIS</button>
+        <button class="payment-btn"        onclick="setPayment(this,'transfer')">🏦 Transfer</button>
+        <button class="payment-btn"        onclick="setPayment(this,'qris')">📱 QRIS</button>
       </div>
 
       <div id="tunai-section">
@@ -238,7 +237,7 @@
 
   <div id="page-laporan" class="page">
     <div class="date-filter">
-      <input type="date" id="date-dari" onchange="renderLaporan()">
+      <input type="date" id="date-dari"   onchange="renderLaporan()">
       <input type="date" id="date-sampai" onchange="renderLaporan()">
       <button class="btn-filter-date" onclick="resetDateFilter()">Reset</button>
     </div>
@@ -258,9 +257,7 @@
     <div class="laporan-table-wrap">
       <table class="laporan-table">
         <thead>
-          <tr>
-            <th>Tanggal</th><th>Omzet</th><th>Laba</th><th>Trx</th><th>Terlaris</th>
-          </tr>
+          <tr><th>Tanggal</th><th>Omzet</th><th>Laba</th><th>Trx</th><th>Terlaris</th></tr>
         </thead>
         <tbody id="laporan-tbody"></tbody>
       </table>
@@ -283,7 +280,7 @@
     <div class="settings-section">
       <div class="settings-row">
         <div class="settings-label">Nama Toko</div>
-        <input class="settings-input" id="set-nama" placeholder="Nama toko" oninput="saveSettings()">
+        <input class="settings-input" id="set-nama"   placeholder="Nama toko"  oninput="saveSettings()">
       </div>
       <div class="settings-row">
         <div class="settings-label">Alamat</div>
@@ -291,7 +288,7 @@
       </div>
       <div class="settings-row">
         <div class="settings-label">No. Telepon</div>
-        <input class="settings-input" id="set-telp" placeholder="08xx-xxxx-xxxx" oninput="saveSettings()">
+        <input class="settings-input" id="set-telp"   placeholder="08xx-xxxx-xxxx" oninput="saveSettings()">
       </div>
       <div class="settings-row">
         <div class="settings-label">Footer Nota 1</div>
@@ -313,7 +310,7 @@
         <div class="settings-label">URL Apps Script</div>
         <input class="settings-input" id="set-sheets-url" placeholder="https://script.google.com/macros/s/..." oninput="saveSettings()">
         <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="btn-primary" onclick="tesSheets()" style="flex:1">🔌 Tes Koneksi</button>
+          <button class="btn-primary"   onclick="tesSheets()" style="flex:1">🔌 Tes Koneksi</button>
           <button class="btn-secondary" onclick="openModal('modal-sheets')" style="flex:1">📖 Cara Setup</button>
         </div>
       </div>
@@ -359,15 +356,18 @@
       </div>
     </div>
 
+    <!-- Zona Berbahaya — section aktivasi akan diinjeksi di atasnya oleh aktivasi.js -->
     <div class="section-title">⚠️ Zona Berbahaya</div>
     <div class="settings-section">
       <div class="settings-row">
         <button class="btn-danger" style="width:100%" onclick="resetAllData()">🗑 Reset Semua Data</button>
-        <div class="settings-label" style="margin-top:6px">Hapus semua produk, laporan, dan riwayat transaksi. Tidak bisa dikembalikan.</div>
+        <div class="settings-label" style="margin-top:6px">
+          Hapus semua produk, laporan, dan riwayat transaksi. Tidak bisa dikembalikan.
+        </div>
       </div>
     </div>
 
-    <div class="app-version">MotoKas — Kasir Digital v4.0 Pro<br>Build 2025 · Sistem Kasir untuk Toko Motor</div>  
+    <div class="app-version">MotoKas — Kasir Digital v4.0 Pro<br>Build 2025 · Sistem Kasir untuk Toko Motor</div>
   </div>
 
   <!-- Bottom Nav -->
@@ -435,7 +435,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-tambah-produk')">Batal</button>
-      <button class="btn-primary" onclick="simpanProduk()">💾 Simpan</button>
+      <button class="btn-primary"   onclick="simpanProduk()">💾 Simpan</button>
     </div>
     <div id="edit-delete-row" style="margin-top:8px;display:none">
       <button class="btn-danger" style="width:100%" onclick="hapusProduk()">🗑 Hapus Produk Ini</button>
@@ -450,11 +450,11 @@
     <div class="modal-title">🔑 Ganti PIN</div>
     <div class="modal-row">
       <div class="modal-label">PIN Lama</div>
-      <input class="modal-input" id="pin-lama" type="password" maxlength="4" placeholder="••••" inputmode="numeric">
+      <input class="modal-input" id="pin-lama"   type="password" maxlength="4" placeholder="••••" inputmode="numeric">
     </div>
     <div class="modal-row">
       <div class="modal-label">PIN Baru (4 digit)</div>
-      <input class="modal-input" id="pin-baru" type="password" maxlength="4" placeholder="••••" inputmode="numeric">
+      <input class="modal-input" id="pin-baru"   type="password" maxlength="4" placeholder="••••" inputmode="numeric">
     </div>
     <div class="modal-row">
       <div class="modal-label">Konfirmasi PIN Baru</div>
@@ -462,7 +462,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-pin')">Batal</button>
-      <button class="btn-primary" onclick="gantiPIN()">✔ Simpan PIN</button>
+      <button class="btn-primary"   onclick="gantiPIN()">✔ Simpan PIN</button>
     </div>
   </div>
 </div>
@@ -474,9 +474,9 @@
     <div class="modal-title">🧾 Struk Transaksi</div>
     <div class="nota-area" id="nota-content"></div>
     <div style="display:flex;gap:8px">
-      <button class="btn-primary" style="flex:1" onclick="window.print()">🖨 Print</button>
+      <button class="btn-primary"   style="flex:1" onclick="window.print()">🖨 Print</button>
       <button class="btn-secondary" style="flex:1" onclick="shareNota()">📤 Bagikan</button>
-      <button class="btn-secondary" onclick="closeModal('modal-nota')">Tutup</button>
+      <button class="btn-secondary"               onclick="closeModal('modal-nota')">Tutup</button>
     </div>
   </div>
 </div>
@@ -492,32 +492,29 @@
       2. Buat project baru → paste kode Apps Script<br>
       3. Deploy → New Deployment → Web App<br>
       4. Set akses: <em>"Anyone"</em> → Deploy<br>
-      5. Copy URL dan paste di Pengaturan 
+      5. Copy URL dan paste di Pengaturan
     </div>
     <button class="btn-primary" style="width:100%;margin-top:14px" onclick="closeModal('modal-sheets')">Mengerti</button>
   </div>
 </div>
 
+<!--
+  URUTAN SCRIPT:
+  1. SweetAlert2  — sync, tersedia sebelum app.js
+  2. Chart.js     — sync, tersedia sebelum app.js
+  3. app.js       — sync, definisikan semua fungsi global
+  4. firebase.js  — type="module" (auto-defer), async Firebase init
+  5. aktivasi.js  — defer, berjalan setelah DOM parse selesai;
+                    patchAppFunctions() dipanggil dari initAktivasi()
+                    dengan retry agar aman meski firebase.js belum selesai
+-->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.8/sweetalert2.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="js/app.js"></script>
-
-<!-- FIX #1: firebase.js (module) duluan, aktivasi.js tunggu event firebaseReady -->
 <script type="module" src="js/firebase.js"></script>
-<script>
-  // FIX #1: aktivasi.js diload setelah Firebase siap via event 'firebaseReady'
-  // Jika Firebase tidak dispatch event dalam 3 detik, tetap load aktivasi
-  let _aktivasiLoaded = false;
-  function _loadAktivasi() {
-    if (_aktivasiLoaded) return;
-    _aktivasiLoaded = true;
-    const s = document.createElement('script');
-    s.src = 'js/aktivasi.js';
-    document.body.appendChild(s);
-  }
-  window.addEventListener('firebaseReady', _loadAktivasi);
-  setTimeout(_loadAktivasi, 3000); // fallback jika event tidak datang
-</script>
+<!-- FIX: tambahkan defer agar aktivasi.js berjalan setelah DOM parse,
+     setara dengan ES module — menghilangkan race condition dengan firebase.js -->
+<script defer src="js/aktivasi.js"></script>
 
 <script>
   if ('serviceWorker' in navigator) {
