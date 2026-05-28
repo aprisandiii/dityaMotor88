@@ -29,14 +29,11 @@ let _isLoadingCloud = false;
 let _lastSavedHash  = '';
 
 function dataHash() {
-  const laporan = window.laporan || {};
-  const d = {
-    p: (window.produk||[]).length,
-    l: Object.keys(laporan).length,
-    r: (window.riwayat||[]).length,
-    t: Object.values(laporan).reduce((s,i)=>s+(i.omzet||0),0)
-  };
-  return JSON.stringify(d);
+  return JSON.stringify({
+    produk: window.produk || [],
+    laporan: window.laporan || {},
+    riwayat: window.riwayat || []
+  });
 }
 
 function tokoRef(path) {
