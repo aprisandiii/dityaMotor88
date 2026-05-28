@@ -21,7 +21,7 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const rtdb = getDatabase(app);
 
-window.FB = { auth, rtdb, uid: null, email: null, isOnline: false, listeners: {} };
+window.FB = { auth, rtdb, uid: null, email: null, isOnline: false, isReady: false, listeners: {} };
 
 /* ── EXPOSE off() agar script non-module bisa stop listener manual ── */
 window._fbOff = { off };
@@ -115,7 +115,7 @@ window.fbLogin = async function(email, password) {
     window.FB.uid      = cred.user.uid;
     window.FB.email    = cred.user.email;
     window.FB.isOnline = true;
-    // Simpan email ke localStorage agar aktivasi.js bisa baca
+    window.FB.isReady  = true;
     localStorage.setItem('mk_email', cred.user.email);
     return { ok: true, user: cred.user };
   } catch(e) {
@@ -133,11 +133,9 @@ window.fbResetPassword = async function(email) {
 };
 
 window.fbLogout = async function() {
-  // Hentikan semua listener realtime
   Object.values(window.FB.listeners).forEach(r => off(r));
   window.FB.listeners = {};
 
-  // Bersihkan data akun lama dari localStorage & memory
   clearLocalData();
   localStorage.removeItem('settings');
   localStorage.removeItem('prefs');
@@ -147,12 +145,10 @@ window.fbLogout = async function() {
   window.FB.uid      = null;
   window.FB.email    = null;
   window.FB.isOnline = false;
+  window.FB.isReady  = false;
   window._pinPassed  = false;
   _lastSavedHash     = '';
 
-  // Reset cart & state kasir via app.js agar tidak bocor antar akun
-  // logoutAkun() di app.js sudah handle ini, tapi fbLogout bisa dipanggil
-  // langsung dari modal cloud — pastikan state bersih di kedua jalur
   if (typeof window.resetCartState === 'function') window.resetCartState();
 
   showSyncBadge('offline');
@@ -165,7 +161,6 @@ window.fbLoadAllData = async function() {
   _isLoadingCloud = true;
   showSyncBadge('syncing');
 
-  // Bersihkan data lama sebelum load data akun baru
   clearLocalData();
 
   try {
@@ -194,7 +189,6 @@ window.fbLoadAllData = async function() {
         if (typeof window.terapkanPengaturan === 'function') window.terapkanPengaturan();
       }
     } else {
-      // Akun baru — tidak ada data di Firebase, pastikan tampil kosong
       syncProduk();
       syncLaporan();
       syncRiwayat();
@@ -226,8 +220,8 @@ window.fbListenRealtime = function() {
     if (_isSaving || _isLoadingCloud) return;
     if (!snap.exists()) return;
 
-    const data    = snap.val();
-    let berubah   = false;
+    const data  = snap.val();
+    let berubah = false;
 
     if (data.produk && JSON.stringify(data.produk) !== JSON.stringify(window.produk)) {
       window.produk = data.produk;
@@ -345,7 +339,7 @@ window.bukaLoginFirebase = function() {
   });
 };
 
-/* ── FIX: isAppActive diganti cek flag _pinPassed yang eksplisit ── */
+/* ── isAppActive ── */
 function isAppActive() {
   return window._pinPassed === true;
 }
@@ -357,14 +351,18 @@ onAuthStateChanged(auth, async (user) => {
     window.FB.uid      = user.uid;
     window.FB.email    = user.email;
     window.FB.isOnline = true;
-    // Simpan email agar aktivasi.js bisa baca meski setelah reload
+    window.FB.isReady  = true; // FIX: tandai FB sudah siap agar tryFirebaseLoad() bisa jalan
     localStorage.setItem('mk_email', user.email);
 
-    // Hanya load data & tampilkan badge jika PIN sudah berhasil
+    // Jika PIN sudah dimasukkan (session aktif / tab lain)
     if (isAppActive()) {
       showSyncBadge('online');
       await window.fbLoadAllData();
       window.fbListenRealtime();
+    } else {
+      // PIN belum dimasukkan — tandai online saja
+      // initApp() akan trigger fbLoadAllData via tryFirebaseLoad() setelah PIN berhasil
+      showSyncBadge('online');
     }
 
     if (btn) {
@@ -377,6 +375,7 @@ onAuthStateChanged(auth, async (user) => {
     window.FB.uid      = null;
     window.FB.email    = null;
     window.FB.isOnline = false;
+    window.FB.isReady  = false;
     showSyncBadge('offline');
     if (btn) {
       btn.innerHTML         = `☁️ <span class="btn-label">Cloud</span>`;
@@ -394,6 +393,7 @@ window.fbRegister = async function(email, password) {
     window.FB.uid      = cred.user.uid;
     window.FB.email    = cred.user.email;
     window.FB.isOnline = true;
+    window.FB.isReady  = true;
     localStorage.setItem('mk_email', cred.user.email);
     return { ok: true, user: cred.user };
   } catch(e) {
@@ -401,17 +401,13 @@ window.fbRegister = async function(email, password) {
   }
 };
 
-/* ── INJECT TOMBOL CLOUD ──
-   FIX: Hanya satu definisi injectCloudButton — di sini saja.
-   aktivasi.js sudah dihapus definisi window.injectCloudButton-nya.
-   Tombol ini juga mengecek tier sebelum aksi. ── */
+/* ── INJECT TOMBOL CLOUD ── */
 window.injectCloudButton = function() {
   const topbarActions = document.querySelector('.header-actions');
   if (topbarActions && !document.getElementById('btnCloudLogin')) {
     const btn     = document.createElement('button');
     btn.id        = 'btnCloudLogin';
     btn.onclick   = () => {
-      // Cek tier jika user belum login Firebase (pakai akun lokal saja)
       if (!window.FB.uid && typeof window.canUseCloudSync === 'function' && !window.canUseCloudSync()) {
         if (typeof window.showUpgradePopup === 'function') window.showUpgradePopup('cloudSync');
         return;
@@ -423,7 +419,4 @@ window.injectCloudButton = function() {
       color:#818cf8;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;`;
     topbarActions.insertBefore(btn, topbarActions.lastElementChild);
   }
-
-  // Catatan: patch window.simpanData dihapus karena fungsi tersebut
-  // tidak pernah didefinisikan di app.js — kode mati, tidak perlu ada.
 };
