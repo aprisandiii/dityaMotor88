@@ -445,17 +445,29 @@ function setFilter(el) {
 
 function openModal(id) {
   document.getElementById(id).classList.add('show');
+  // Reset form HANYA jika modal produk dibuka sebagai TAMBAH BARU
+  // (bukan dari editProduk yang sudah isi field duluan)
+  // Cek: jika edit-produk-id masih kosong = memang buka untuk tambah baru
   if (id === 'modal-tambah-produk') {
-    document.getElementById('modal-produk-title').textContent = 'Tambah Produk';
-    document.getElementById('edit-produk-id').value = '';
-    ['prod-nama','prod-hpp','prod-harga','prod-stok','prod-minstok','prod-sku'].forEach(i => document.getElementById(i).value = '');
-    document.getElementById('prod-cat').value = '';
-    document.getElementById('edit-delete-row').style.display = 'none';
+    const editId = document.getElementById('edit-produk-id').value;
+    if (!editId) {
+      // Tambah produk baru — reset semua field
+      document.getElementById('modal-produk-title').textContent = 'Tambah Produk';
+      ['prod-nama','prod-hpp','prod-harga','prod-stok','prod-minstok','prod-sku'].forEach(i => document.getElementById(i).value = '');
+      document.getElementById('prod-cat').value = '';
+      document.getElementById('edit-delete-row').style.display = 'none';
+    }
+    // Jika editId ada (dipanggil dari editProduk), field sudah diisi — jangan di-reset
   }
 }
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('show');
+  // Saat modal produk ditutup, selalu reset edit-produk-id
+  // agar next open untuk tambah baru tidak terkontaminasi
+  if (id === 'modal-tambah-produk') {
+    document.getElementById('edit-produk-id').value = '';
+  }
 }
 
 function editProduk(id) {
