@@ -108,7 +108,13 @@ function showScreen(name) {
 
 // ===== INIT =====
 window.addEventListener('load', () => {
-  showScreen('pin');
+  // Cek apakah user pernah login sebelumnya
+  const sudahLogin = localStorage.getItem('mk_email');
+  if (sudahLogin) {
+    showScreen('pin');
+  } else {
+    showScreen('auth');
+  }
 
   const s = getData('settings', {});
   if (s.nama)   document.getElementById('pin-store-name').textContent = s.nama;
