@@ -10,7 +10,7 @@
 // ============================================================
 
 // ── SECRET SALT ──────────────────────────────────────────────
-const _SALT = 'SuksesBersamaMotoKas#2026';
+const _SALT = 'BismillahSayaAkanSuksesBersamaMotoKas#1';
 
 // ── TIER ─────────────────────────────────────────────────────
 const TIER = {
@@ -274,7 +274,7 @@ function resetLisensi() {
 
 function beliLisensi() {
   const email = getEmailLogin() || 'email-anda';
-  const wa = `https://wa.me/6281234567890?text=Halo%2C%20saya%20mau%20beli%20lisensi%20MotoKas.%0AEmail%3A%20${encodeURIComponent(email)}`;
+  const wa = `https://wa.me/6285798132246?text=Halo%2C%20saya%20mau%20beli%20lisensi%20MotoKas.%0AEmail%3A%20${encodeURIComponent(email)}`;
   window.open(wa, '_blank');
 }
 
