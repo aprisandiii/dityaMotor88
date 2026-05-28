@@ -31,6 +31,11 @@ function setData(key, val) {
   }
 }
 
+// Expose getData & setData ke window agar aktivasi.js (defer/module lain) bisa pakai
+// tanpa ReferenceError — aktivasi.js tidak berada dalam scope yang sama dengan app.js
+window.getData = function(key, def) { return getData(key, def); };
+window.setData = function(key, val) { return setData(key, val); };
+
 // Expose data awal dari localStorage ke window
 window.produk     = getData('produk', []);
 window.laporan    = getData('laporan', {});
@@ -39,6 +44,23 @@ window.pengaturan = getData('settings', {});
 
 // Flag PIN sudah berhasil — digunakan firebase.js agar tidak load data sebelum PIN
 window._pinPassed = false;
+
+// Expose resetCartState agar firebase.js (ES module) bisa reset state kasir
+// saat fbLogout dipanggil langsung dari modal cloud tanpa lewat logoutAkun()
+window.resetCartState = function() {
+  cart          = [];
+  diskonMode    = 'rp';
+  paymentMethod = 'tunai';
+  lastNota      = '';
+  produkFilter  = 'Semua';
+  updateCartBadge();
+  ['diskon-val','uang-bayar','kasir-name'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const kemRow = document.getElementById('kembalian-row');
+  if (kemRow) kemRow.style.display = 'none';
+};
 
 // Expose fungsi agar Firebase bisa memanggil setelah sync data
 window.syncProdukDariFirebase = function() {
@@ -249,6 +271,18 @@ function saveForcedPin() {
 
 function lockApp() {
   window._pinPassed = false;
+
+  // Simpan total transaksi aktif sebelum lock agar bisa dilanjutkan
+  const totalEl = document.getElementById('co-total');
+  if (totalEl) window._cartTotalSebelumLock = totalEl.textContent;
+
+  // Reset state kasir — cart DIPERTAHANKAN (kasir kembali sebentar),
+  // tapi form input dibersihkan agar tidak bocor ke orang lain
+  document.getElementById('uang-bayar').value  = '';
+  document.getElementById('kasir-name').value  = '';
+  const kemRow = document.getElementById('kembalian-row');
+  if (kemRow) kemRow.style.display = 'none';
+
   document.getElementById('app').style.display        = 'none';
   document.getElementById('pin-screen').style.display = 'flex';
   currentPin = '';
@@ -1141,14 +1175,29 @@ function logoutAkun() {
   if (!confirm('Yakin ingin logout dari akun?')) return;
   window._pinPassed = false;
   if (window.FB && typeof window.fbLogout === 'function') window.fbLogout();
+
+  // Reset semua state kasir — beda akun = beda session, cart HARUS dikosongkan
+  cart         = [];
+  diskonMode   = 'rp';
+  paymentMethod = 'tunai';
+  lastNota     = '';
+  produkFilter = 'Semua';
+  updateCartBadge();
+
+  // Reset UI kasir
+  ['diskon-val','uang-bayar','kasir-name'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const kemRow = document.getElementById('kembalian-row');
+  if (kemRow) kemRow.style.display = 'none';
+
   document.getElementById('app').style.display         = 'none';
   document.getElementById('pin-screen').style.display  = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
   document.getElementById('login-email').value         = '';
   document.getElementById('login-password').value      = '';
   document.getElementById('login-error').textContent   = '';
-  cart = [];
-  updateCartBadge();
   toast('Berhasil logout ✓');
 }
 
