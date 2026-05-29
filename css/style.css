@@ -527,12 +527,6 @@ body {
   z-index: 99999 !important;
 }
 
-.swal2-popup {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-}
 /* ── AUTH SCREEN ── */
 #auth-screen {
   display: flex;
@@ -625,4 +619,96 @@ body {
   font-size: 11px;
   color: #3a3a3a;
   margin-top: 24px;
+}
+/* ══════════════════════════════════════════
+   MotoKas — style-patch.css
+   Tambahkan snippet ini ke BAGIAN BAWAH style.css
+══════════════════════════════════════════ */
+
+/* ── FIX: laba-warn element (ada di app.js tapi tidak ada di CSS) ── */
+#laba-warn {
+  background: rgba(224, 82, 82, 0.08);
+  border: 1px solid rgba(224, 82, 82, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--red);
+  margin-top: 8px;
+  display: none;
+  line-height: 1.5;
+}
+
+/* ── FIX: auth-hint (ada di HTML tapi tidak ada di CSS) ── */
+.auth-hint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 12px;
+}
+.auth-hint span {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+/* ── FIX: offline badge (ditambahkan oleh app-patch.js P6) ── */
+#offline-badge {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 9999;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #4b5563;
+  color: #ccc;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ── FIX: badge stok habis di produk list (supaya lebih jelas) ── */
+.btn-add-cart.disabled {
+  background: var(--bg4);
+  color: var(--text3);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── FIX: SweetAlert2 override yang lebih kompatibel ── */
+/* HAPUS blok .swal2-popup { position: fixed !important ... } yang lama */
+/* Ganti dengan ini: */
+.swal2-container {
+  z-index: 99999 !important;
+}
+
+/* ── TAMBAHAN: animasi loading pada stat cards ── */
+.stat-value.loading {
+  opacity: 0.4;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+
+/* ── TAMBAHAN: void badge lebih jelas ── */
+.riwayat-item.is-void {
+  opacity: 0.55;
+  border-color: rgba(224, 82, 82, 0.2);
+}
+
+/* ── TAMBAHAN: responsive table laporan di layar kecil ── */
+@media (max-width: 360px) {
+  .laporan-table th:nth-child(5),
+  .laporan-table td:nth-child(5) {
+    display: none;
+  }
+  .laporan-table th:nth-child(3),
+  .laporan-table td:nth-child(3) {
+    display: none;
+  }
 }
