@@ -1,20 +1,21 @@
 /* ══════════════════════════════════════════
-   dityaMotor 88 — Service Worker v4.0
-   Network-first strategy, auto-update
+   MotoKas — Service Worker v4.1
+   Perbaikan:
+   - Tambah js/aktivasi.js & js/firebase.js ke LOCAL_ASSETS
+   - Tambah background sync helper untuk transaksi offline
 ══════════════════════════════════════════ */
-
-const CACHE_NAME = 'dm88-v4';
-
+const CACHE_NAME = 'dm88-v4.1';
 const LOCAL_ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './js/app.js',
+  './js/aktivasi.js',   // FIX: ditambahkan agar offline tetap jalan
+  './js/firebase.js',   // FIX: ditambahkan agar offline tetap jalan
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];
-
 const EXTERNAL_DOMAINS = [
   'firebaseapp.com',
   'firebasedatabase.app',
@@ -37,7 +38,7 @@ self.addEventListener('install', e => {
       )
     )
   );
-  self.skipWaiting(); // Langsung aktif, tidak tunggu tab lama ditutup
+  self.skipWaiting();
 });
 
 // ── ACTIVATE: hapus cache lama ──
@@ -54,17 +55,14 @@ self.addEventListener('activate', e => {
       )
     )
   );
-  self.clients.claim(); // Langsung kontrol semua tab yang terbuka
+  self.clients.claim();
 });
 
 // ── FETCH: network-first, cache sebagai fallback ──
 self.addEventListener('fetch', e => {
   const url = e.request.url;
-
-  // Skip request non-GET
   if (e.request.method !== 'GET') return;
 
-  // External domain: langsung ke network, tidak di-cache
   const isExternal = EXTERNAL_DOMAINS.some(domain => url.includes(domain));
   if (isExternal) {
     e.respondWith(
@@ -75,11 +73,9 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Network-first untuk semua aset lokal
   e.respondWith(
     fetch(e.request)
       .then(response => {
-        // Simpan ke cache kalau response valid
         if (
           response &&
           response.status === 200 &&
@@ -91,16 +87,11 @@ self.addEventListener('fetch', e => {
         return response;
       })
       .catch(() => {
-        // Offline: ambil dari cache
         return caches.match(e.request).then(cached => {
           if (cached) return cached;
-
-          // Fallback untuk navigasi halaman
           if (e.request.mode === 'navigate') {
             return caches.match('./index.html');
           }
-
-          // Tidak ada di cache dan offline
           return new Response('', {
             status: 503,
             statusText: 'Offline - Resource not cached'
@@ -108,4 +99,24 @@ self.addEventListener('fetch', e => {
         });
       })
   );
+});
+
+// ── BACKGROUND SYNC: kirim transaksi pending saat online kembali ──
+self.addEventListener('sync', e => {
+  if (e.tag === 'sync-transaksi') {
+    e.waitUntil(
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ type: 'SYNC_PENDING_TRX' });
+        });
+      })
+    );
+  }
+});
+
+// ── MESSAGE: terima perintah dari halaman utama ──
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
