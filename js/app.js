@@ -1,27 +1,43 @@
+// ===================================================
+// MotoKas — app.js  (versi perbaikan)
+// Perbaikan:
+//  1. hitungKembalian: tidak lagi parse dari DOM, pakai state _currentTotal
+//  2. cart maxStok di-refresh setiap renderCart dari storage terbaru
+//  3. voidTransaksi: gunakan field waktu string jika trx.id bukan timestamp valid
+//  4. kirimSheets: AbortController timeout 10 detik
+//  5. renderLaporan: data iso kosong TIDAK lolos filter tanggal
+//  6. resetAllData: ikutkan 'prefs' dan '_last_kasir'
+// ===================================================
+
 // ===== STATE =====
-let deferredPrompt = null;
-let currentPin = '';
-let pinAttempts = 0;
-let lockUntil = 0;
-let cart = [];
-let produkFilter = 'Semua';
-let diskonMode = 'rp';
-let paymentMethod = 'tunai';
-let lastNota = '';
-let chartInstance = null;
+let deferredPrompt        = null;
+let currentPin            = '';
+let pinAttempts           = 0;
+let lockUntil             = 0;
+let cart                  = [];
+let produkFilter          = 'Semua';
+let diskonMode            = 'rp';
+let paymentMethod         = 'tunai';
+let lastNota              = '';
+let lastTrx               = null;
+let chartInstance         = null;
+let _checkoutInProgress   = false;
+// FIX #1 — simpan total numerik di state, bukan baca dari DOM
+let _currentTotal         = 0;
 
 // ===== STORAGE =====
 function getData(key, def) {
   try { return JSON.parse(localStorage.getItem(key)) ?? def; }
   catch { return def; }
 }
+
 function setData(key, val) {
   localStorage.setItem(key, JSON.stringify(val));
   if (key === 'produk')   window.produk     = val;
   if (key === 'laporan')  window.laporan    = val;
   if (key === 'riwayat')  window.riwayat    = val;
   if (key === 'settings') window.pengaturan = val;
-  if (['produk','laporan','riwayat','settings'].includes(key)) {
+  if (['produk', 'laporan', 'riwayat', 'settings'].includes(key)) {
     clearTimeout(window._fbSaveTimeout);
     window._fbSaveTimeout = setTimeout(() => {
       if (window.FB && window.FB.uid && typeof window.fbSimpanSemua === 'function') {
@@ -34,71 +50,66 @@ function setData(key, val) {
 window.getData = getData;
 window.setData = setData;
 
-window.produk     = getData('produk', []);
-window.laporan    = getData('laporan', {});
-window.riwayat    = getData('riwayat', []);
+window.produk     = getData('produk',   []);
+window.laporan    = getData('laporan',  {});
+window.riwayat    = getData('riwayat',  []);
 window.pengaturan = getData('settings', {});
-
 window._pinPassed = false;
 
-window.resetCartState = function() {
-  cart          = [];
-  diskonMode    = 'rp';
-  paymentMethod = 'tunai';
-  lastNota      = '';
-  produkFilter  = 'Semua';
+// ===== RESET CART STATE =====
+window.resetCartState = function () {
+  cart                = [];
+  diskonMode          = 'rp';
+  paymentMethod       = 'tunai';
+  lastNota            = '';
+  lastTrx             = null;
+  produkFilter        = 'Semua';
+  _checkoutInProgress = false;
+  _currentTotal       = 0;
   updateCartBadge();
-  ['diskon-val','uang-bayar','kasir-name'].forEach(id => {
+  ['diskon-val', 'uang-bayar'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  // nama kasir TIDAK di-clear — diingat antar transaksi
   const kemRow = document.getElementById('kembalian-row');
   if (kemRow) kemRow.style.display = 'none';
 };
 
-window.syncProdukDariFirebase = function() {
-  const produk = window.produk || [];
-  localStorage.setItem('produk', JSON.stringify(produk));
+// ===== FIREBASE SYNC HELPERS =====
+window.syncProdukDariFirebase = function () {
+  localStorage.setItem('produk', JSON.stringify(window.produk || []));
   renderProduk();
 };
-window.syncLaporanDariFirebase = function() {
-  const laporan = window.laporan || {};
-  localStorage.setItem('laporan', JSON.stringify(laporan));
-  renderLaporan(); renderRiwayat();
-};
-window.syncRiwayatDariFirebase = function() {
-  const riwayat = window.riwayat || [];
-  localStorage.setItem('riwayat', JSON.stringify(riwayat));
+window.syncLaporanDariFirebase = function () {
+  localStorage.setItem('laporan', JSON.stringify(window.laporan || {}));
+  renderLaporan();
   renderRiwayat();
 };
-window.updateDashboard = function() { renderDashboard(); };
+window.syncRiwayatDariFirebase = function () {
+  localStorage.setItem('riwayat', JSON.stringify(window.riwayat || []));
+  renderRiwayat();
+};
+window.updateDashboard = function () { renderDashboard(); };
 
-// ===== HELPER: tampilkan layar secara eksklusif =====
+// ===== LAYAR =====
 function showScreen(name) {
   const screens = {
     auth: document.getElementById('auth-screen'),
     pin:  document.getElementById('pin-screen'),
     app:  document.getElementById('app'),
   };
-
   Object.values(screens).forEach(el => { if (el) el.style.display = 'none'; });
-
   if (screens[name]) {
-    screens[name].style.display = name === 'pin' || name === 'auth' ? 'flex' : 'block';
+    screens[name].style.display = (name === 'pin' || name === 'auth') ? 'flex' : 'block';
   }
-
   const banner = document.getElementById('install-banner');
-  if (banner) {
-    banner.style.zIndex = (name === 'app') ? '1000' : '-1';
-  }
+  if (banner) banner.style.zIndex = (name === 'app') ? '1000' : '-1';
 
   if (name === 'pin' || name === 'auth') {
-    const staleOverlay = document.getElementById('force-pin-overlay');
-    if (staleOverlay) staleOverlay.remove();
-    const resetOverlay = document.getElementById('reset-confirm-overlay');
-    if (resetOverlay) resetOverlay.remove();
+    document.getElementById('force-pin-overlay')?.remove();
+    document.getElementById('reset-confirm-overlay')?.remove();
   }
-
   if (name === 'pin') {
     currentPin = '';
     updatePinDots();
@@ -108,26 +119,22 @@ function showScreen(name) {
 
 // ===== INIT =====
 window.addEventListener('load', () => {
-  // FIX: cek apakah user pernah login — kalau belum tampil AUTH, bukan PIN
   const sudahLogin = localStorage.getItem('mk_email');
-  if (sudahLogin) {
-    showScreen('pin');
-  } else {
-    showScreen('auth');
-  }
+  showScreen(sudahLogin ? 'pin' : 'auth');
 
   const s = getData('settings', {});
   if (s.nama)   document.getElementById('pin-store-name').textContent = s.nama;
   if (s.alamat) document.getElementById('pin-store-addr').textContent = s.alamat;
 
   window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault(); deferredPrompt = e;
+    e.preventDefault();
+    deferredPrompt = e;
     const banner = document.getElementById('install-banner');
     if (banner) banner.style.display = 'flex';
   });
 
   const today   = new Date().toISOString().split('T')[0];
-  const weekAgo = new Date(Date.now() - 7*24*3600*1000).toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString().split('T')[0];
   document.getElementById('date-dari').value   = weekAgo;
   document.getElementById('date-sampai').value = today;
 
@@ -142,24 +149,24 @@ window.addEventListener('load', () => {
     lockUntil   = savedLock;
     pinAttempts = getData('_pin_attempts', 0);
     const sisa  = Math.ceil((savedLock - Date.now()) / 1000);
-    const mnt   = Math.floor(sisa / 60);
-    const dtk   = sisa % 60;
-    showPinStatus(`🔒 Terkunci ${mnt > 0 ? mnt + 'm ' : ''}${dtk}d lagi`, 'error');
+    showPinStatus(`🔒 Terkunci ${formatSisa(sisa)} lagi`, 'error');
   }
 
-  document.addEventListener('keydown', function(e) {
+  document.addEventListener('keydown', e => {
     const pinScreen = document.getElementById('pin-screen');
     if (!pinScreen || pinScreen.style.display === 'none') return;
-    if (document.activeElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
-    if (e.key >= '0' && e.key <= '9') {
-      pinInput(e.key);
-    } else if (e.key === 'Backspace' || e.key === 'Delete') {
-      pinDel();
-    } else if (e.key === 'Enter' && currentPin.length === 4) {
-      checkPin();
-    }
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+    if (e.key >= '0' && e.key <= '9') pinInput(e.key);
+    else if (e.key === 'Backspace' || e.key === 'Delete') pinDel();
+    else if (e.key === 'Enter' && currentPin.length === 4) checkPin();
   });
 });
+
+function formatSisa(detik) {
+  const m = Math.floor(detik / 60);
+  const d = detik % 60;
+  return m > 0 ? `${m}m ${d}d` : `${d}d`;
+}
 
 function installPWA() {
   if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; }
@@ -169,18 +176,13 @@ function installPWA() {
 // ===== PIN =====
 function pinInput(d) {
   if (currentPin.length >= 4) return;
-
   const savedLock = getData('_pin_lock_until', 0);
   if (savedLock && Date.now() < savedLock) {
     lockUntil = savedLock;
-    const sisaDetik = Math.ceil((savedLock - Date.now()) / 1000);
-    const mnt   = Math.floor(sisaDetik / 60);
-    const dtk   = sisaDetik % 60;
-    const label = mnt > 0 ? `${mnt}m ${dtk}d` : `${dtk}d`;
-    showPinStatus(`🔒 Terkunci ${label} lagi`, 'error');
+    const sisa = Math.ceil((savedLock - Date.now()) / 1000);
+    showPinStatus(`🔒 Terkunci ${formatSisa(sisa)} lagi`, 'error');
     return;
   }
-
   currentPin += d;
   updatePinDots();
   if (currentPin.length === 4) setTimeout(checkPin, 200);
@@ -198,7 +200,7 @@ function updatePinDots() {
 }
 
 function showPinStatus(msg, type = '') {
-  const el = document.getElementById('pinStatus');
+  const el       = document.getElementById('pinStatus');
   el.textContent = msg;
   el.className   = 'pin-status ' + type;
 }
@@ -208,7 +210,7 @@ function checkPin() {
   if (currentPin === saved) {
     showPinStatus('✓ Berhasil', 'success');
     pinAttempts = 0;
-    setData('_pin_attempts', 0);
+    setData('_pin_attempts',  0);
     setData('_pin_lock_until', 0);
     setTimeout(() => {
       showScreen('app');
@@ -219,7 +221,6 @@ function checkPin() {
   } else {
     pinAttempts++;
     setData('_pin_attempts', pinAttempts);
-
     if (pinAttempts >= 5) {
       lockUntil = Date.now() + 5 * 60 * 1000;
       setData('_pin_lock_until', lockUntil);
@@ -232,8 +233,7 @@ function checkPin() {
     currentPin = '';
     updatePinDots();
     setTimeout(() => {
-      const stillLocked = getData('_pin_lock_until', 0);
-      if (Date.now() < stillLocked) return;
+      if (Date.now() < getData('_pin_lock_until', 0)) return;
       showPinStatus('Masukkan PIN');
     }, 1500);
   }
@@ -242,9 +242,7 @@ function checkPin() {
 function checkDefaultPin() {
   const saved        = getData('pin', '1234');
   const sudahDiganti = getData('_pin_sudah_diganti', false);
-  if (saved === '1234' && !sudahDiganti) {
-    showForcePinChangeDialog();
-  }
+  if (saved === '1234' && !sudahDiganti) showForcePinChangeDialog();
 }
 
 function showForcePinChangeDialog() {
@@ -273,7 +271,8 @@ function showForcePinChangeDialog() {
         style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:2px solid #444;
                background:#111;color:#fff;font-size:22px;text-align:center;letter-spacing:8px;
                margin-bottom:6px;outline:none"/>
-      <p id="fp-error" style="color:#e74c3c;font-size:12px;min-height:16px;text-align:center;margin:4px 0 16px"></p>
+      <p id="fp-error" style="color:#e74c3c;font-size:12px;min-height:16px;text-align:center;
+                               margin:4px 0 16px"></p>
       <button onclick="saveForcedPin()"
         style="width:100%;padding:12px;border-radius:8px;border:none;
                background:#f5c542;color:#111;font-size:15px;font-weight:700;cursor:pointer">
@@ -281,9 +280,9 @@ function showForcePinChangeDialog() {
       </button>
     </div>`;
   document.body.appendChild(overlay);
-  ['fp-baru','fp-konfirm'].forEach(id => {
-    document.getElementById(id).addEventListener('input', function() {
-      this.value = this.value.replace(/\D/g,'').slice(0,4);
+  ['fp-baru', 'fp-konfirm'].forEach(id => {
+    document.getElementById(id).addEventListener('input', function () {
+      this.value = this.value.replace(/\D/g, '').slice(0, 4);
     });
   });
   document.getElementById('fp-baru').focus();
@@ -293,9 +292,9 @@ function saveForcedPin() {
   const baru    = document.getElementById('fp-baru').value.trim();
   const konfirm = document.getElementById('fp-konfirm').value.trim();
   const errEl   = document.getElementById('fp-error');
-  if (baru.length !== 4)  { errEl.textContent = 'PIN harus 4 digit angka.'; return; }
-  if (baru === '1234')    { errEl.textContent = 'PIN tidak boleh sama dengan default (1234).'; return; }
-  if (baru !== konfirm)   { errEl.textContent = 'Konfirmasi PIN tidak cocok.'; return; }
+  if (baru.length !== 4) { errEl.textContent = 'PIN harus 4 digit angka.'; return; }
+  if (baru === '1234')   { errEl.textContent = 'PIN tidak boleh sama dengan default (1234).'; return; }
+  if (baru !== konfirm)  { errEl.textContent = 'Konfirmasi PIN tidak cocok.'; return; }
   setData('pin', baru);
   setData('_pin_sudah_diganti', true);
   document.getElementById('force-pin-overlay').remove();
@@ -304,22 +303,21 @@ function saveForcedPin() {
 
 function lockApp() {
   window._pinPassed = false;
-
-  if (window.FB && window.FB.listeners && window._fbOff) {
-    try {
+  try {
+    if (window.FB?.listeners && window._fbOff) {
       Object.values(window.FB.listeners).forEach(r => window._fbOff.off(r));
       window.FB.listeners = {};
-    } catch(e) { console.warn('lockApp: gagal hentikan listener', e); }
-  }
+    }
+  } catch (e) { console.warn('lockApp: gagal hentikan listener', e); }
 
-  ['uang-bayar','kasir-name'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
+  const el = document.getElementById('uang-bayar');
+  if (el) el.value = '';
   const kemRow = document.getElementById('kembalian-row');
   if (kemRow) kemRow.style.display = 'none';
 
-  currentPin = '';
+  currentPin          = '';
+  _checkoutInProgress = false;
+  _currentTotal       = 0;
   updatePinDots();
   showPinStatus('Masukkan PIN');
   showScreen('pin');
@@ -337,7 +335,9 @@ function gantiPIN() {
   setData('_pin_sudah_diganti', true);
   closeModal('modal-pin');
   toast('PIN berhasil diganti ✓', 'success');
-  ['pin-lama','pin-baru','pin-konfirm'].forEach(id => document.getElementById(id).value = '');
+  ['pin-lama', 'pin-baru', 'pin-konfirm'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
 }
 
 function resetPinPrompt() {
@@ -359,19 +359,22 @@ function resetPinPrompt() {
 
 // ===== APP INIT =====
 function initApp() {
-  window.produk  = [];
-  window.laporan = {};
-  window.riwayat = [];
+  window.produk  = getData('produk',   []);
+  window.laporan = getData('laporan',  {});
+  window.riwayat = getData('riwayat',  []);
   loadSettings();
   renderDashboard();
   renderProduk();
   renderLaporan();
   renderRiwayat();
+
+  const savedKasir = localStorage.getItem('_last_kasir');
+  if (savedKasir) {
+    const el = document.getElementById('kasir-name');
+    if (el && !el.value) el.value = savedKasir;
+  }
   if (typeof window.injectCloudButton === 'function') window.injectCloudButton();
 
-  // FIX: retry loop — tunggu window.FB.uid siap (diisi oleh onAuthStateChanged)
-  // firebase.js adalah ES module sehingga onAuthStateChanged bisa belum selesai
-  // saat initApp() dipanggil pertama kali setelah PIN berhasil
   let _fbRetry = 0;
   function tryFirebaseLoad() {
     if (_fbRetry >= 20) {
@@ -379,25 +382,10 @@ function initApp() {
       return;
     }
     _fbRetry++;
-
-    // FB module belum dimuat sama sekali
-    if (!window.FB) {
-      setTimeout(tryFirebaseLoad, 300);
-      return;
-    }
-
-    // onAuthStateChanged belum selesai — uid belum terisi
-    if (!window.FB.uid) {
-      setTimeout(tryFirebaseLoad, 300);
-      return;
-    }
-
-    // FB siap & user sudah login → load data lalu aktifkan listener realtime
+    if (!window.FB?.uid) { setTimeout(tryFirebaseLoad, 300); return; }
     if (typeof window.fbLoadAllData === 'function') {
       window.fbLoadAllData().then(() => {
-        if (typeof window.fbListenRealtime === 'function') {
-          window.fbListenRealtime();
-        }
+        if (typeof window.fbListenRealtime === 'function') window.fbListenRealtime();
       });
     } else {
       setTimeout(tryFirebaseLoad, 300);
@@ -406,7 +394,7 @@ function initApp() {
   tryFirebaseLoad();
 }
 
-// ===== NAVIGATION =====
+// ===== NAVIGASI =====
 function navTo(page, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -416,17 +404,17 @@ function navTo(page, btn) {
   if (page === 'laporan')   { renderLaporan(); renderRiwayat(); }
 }
 
-// ===== SETTINGS =====
+// ===== PENGATURAN =====
 function loadSettings() {
   const s = getData('settings', {});
-  document.getElementById('set-nama').value         = s.nama    || '';
-  document.getElementById('set-alamat').value       = s.alamat  || '';
-  document.getElementById('set-telp').value         = s.telp    || '';
-  document.getElementById('set-footer1').value      = s.footer1 || 'Terima kasih telah berbelanja!';
-  document.getElementById('set-footer2').value      = s.footer2 || 'Barang yang sudah dibeli tidak dapat dikembalikan';
+  document.getElementById('set-nama').value         = s.nama         || '';
+  document.getElementById('set-alamat').value       = s.alamat       || '';
+  document.getElementById('set-telp').value         = s.telp         || '';
+  document.getElementById('set-footer1').value      = s.footer1      || 'Terima kasih telah berbelanja!';
+  document.getElementById('set-footer2').value      = s.footer2      || 'Barang yang sudah dibeli tidak dapat dikembalikan';
   document.getElementById('set-sheets-url').value   = s.sheets_url   || '';
   document.getElementById('set-kode-rahasia').value = s.kode_rahasia || '';
-  document.getElementById('hdr-name').textContent   = s.nama    || 'Nama Toko';
+  document.getElementById('hdr-name').textContent   = s.nama         || 'Nama Toko';
   document.getElementById('hdr-sub').textContent    = (s.alamat ? s.alamat + ' — ' : '') + 'v4.0';
   document.getElementById('pin-store-name').textContent = s.nama || 'Nama Toko';
   if (s.alamat) document.getElementById('pin-store-addr').textContent = s.alamat;
@@ -452,6 +440,7 @@ function saveSettings() {
   document.getElementById('hdr-name').textContent = s.nama || 'Nama Toko';
   document.getElementById('hdr-sub').textContent  = (s.alamat ? s.alamat + ' — ' : '') + 'v4.0';
   updateSheetsStatus(!!s.sheets_url);
+  toast('Pengaturan disimpan ✓', 'success');
 }
 
 function toggleSetting(key, btn) {
@@ -472,18 +461,20 @@ function updateSheetsStatus(connected) {
 
 // ===== PRODUK =====
 function getCatIcon(cat) {
-  const icons = { 'Oli':'🛢️','Spare Part':'⚙️','Aksesoris':'🔩','Ban':'🔄','Aki':'🔋','Lainnya':'📦' };
+  const icons = {
+    'Oli': '🛢️', 'Spare Part': '⚙️', 'Aksesoris': '🔩',
+    'Ban': '🔄', 'Aki': '🔋', 'Lainnya': '📦',
+  };
   return icons[cat] || '📦';
 }
 
 function renderProduk() {
-  const produk = getData('produk', []);
-  const q      = (document.getElementById('search-produk').value || '').toLowerCase();
+  const produk   = getData('produk', []);
+  const q        = (document.getElementById('search-produk').value || '').toLowerCase();
   const filtered = produk.filter(p =>
     (produkFilter === 'Semua' || p.kategori === produkFilter) &&
     (!q || p.nama.toLowerCase().includes(q) || (p.sku || '').toLowerCase().includes(q))
   );
-
   const list = document.getElementById('produk-list');
   if (filtered.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>Belum ada produk.<br>Tap ＋ untuk tambah produk.</div>';
@@ -503,7 +494,9 @@ function renderProduk() {
       </div>
       <div class="produk-actions">
         <button class="btn-edit-prod" onclick="editProduk(${p.id})">✏️</button>
-        <button class="btn-add-cart ${p.stok <= 0 ? 'disabled' : ''}" onclick="${p.stok > 0 ? `addToCart(${p.id})` : ''}">＋</button>
+        <button class="btn-edit-prod" onclick="openRestok(${p.id})" title="Tambah stok masuk">📦+</button>
+        <button class="btn-add-cart ${p.stok <= 0 ? 'disabled' : ''}"
+          onclick="${p.stok > 0 ? `addToCart(${p.id})` : ''}">＋</button>
       </div>
     </div>`;
   }).join('');
@@ -522,7 +515,8 @@ function openModal(id) {
     const editId = document.getElementById('edit-produk-id').value;
     if (!editId) {
       document.getElementById('modal-produk-title').textContent = 'Tambah Produk';
-      ['prod-nama','prod-hpp','prod-harga','prod-stok','prod-minstok','prod-sku'].forEach(i => document.getElementById(i).value = '');
+      ['prod-nama', 'prod-hpp', 'prod-harga', 'prod-stok', 'prod-minstok', 'prod-sku']
+        .forEach(i => document.getElementById(i).value = '');
       document.getElementById('prod-cat').value = '';
       document.getElementById('edit-delete-row').style.display = 'none';
     }
@@ -568,10 +562,14 @@ function simpanProduk() {
 
   let produk = getData('produk', []);
   if (editId) {
-    produk = produk.map(p => p.id === editId ? { ...p, nama, kategori, hpp, harga, stok, minstok, sku } : p);
+    produk = produk.map(p => p.id === editId
+      ? { ...p, nama, kategori, hpp, harga, stok, minstok, sku }
+      : p
+    );
     toast('Produk diperbarui ✓', 'success');
   } else {
-    produk.push({ id: Date.now(), nama, kategori, hpp, harga, stok, minstok, sku, terjual: 0 });
+    const newId = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+    produk.push({ id: newId, nama, kategori, hpp, harga, stok, minstok, sku, terjual: 0 });
     toast('Produk ditambahkan ✓', 'success');
   }
   setData('produk', produk);
@@ -589,6 +587,93 @@ function hapusProduk() {
   toast('Produk dihapus');
 }
 
+// ===== RESTOK =====
+function openRestok(id) {
+  const p = getData('produk', []).find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('restok-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id    = 'restok-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.75);
+    z-index:99998;display:flex;align-items:flex-end;justify-content:center;`;
+  overlay.innerHTML = `
+    <div style="background:#1a1a1a;border-radius:20px 20px 0 0;width:100%;max-width:480px;
+                padding:24px 20px 32px;color:#fff;font-family:inherit">
+      <div style="width:40px;height:4px;background:#444;border-radius:2px;margin:0 auto 20px"></div>
+      <h3 style="margin:0 0 4px;font-size:16px;color:#f0ece6">📦 Stok Masuk</h3>
+      <p style="font-size:13px;color:#888;margin:0 0 18px">
+        ${p.nama} · Stok sekarang: <strong style="color:#f5c542">${p.stok}</strong>
+      </p>
+      <label style="display:block;font-size:12px;color:#888;margin-bottom:5px">Jumlah Masuk *</label>
+      <input id="restok-qty" type="number" min="1" placeholder="contoh: 10"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:2px solid #333;
+               background:#111;color:#fff;font-size:16px;margin-bottom:12px;outline:none"/>
+      <label style="display:block;font-size:12px;color:#888;margin-bottom:5px">Harga Modal Baru (HPP) — opsional</label>
+      <input id="restok-hpp" type="number" min="0" placeholder="Kosongkan jika tidak berubah"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:2px solid #333;
+               background:#111;color:#fff;font-size:16px;margin-bottom:12px;outline:none"
+        value="${p.hpp || ''}"/>
+      <label style="display:block;font-size:12px;color:#888;margin-bottom:5px">Catatan — opsional</label>
+      <input id="restok-catatan" type="text" placeholder="contoh: Beli dari Supplier A"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:2px solid #333;
+               background:#111;color:#fff;font-size:14px;margin-bottom:18px;outline:none"/>
+      <button onclick="simpanRestok(${p.id})"
+        style="width:100%;padding:12px;border-radius:8px;border:none;
+               background:#f5c542;color:#111;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px">
+        💾 Simpan Stok Masuk
+      </button>
+      <button onclick="document.getElementById('restok-overlay').remove()"
+        style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;
+               background:transparent;color:#888;font-size:14px;cursor:pointer">
+        Batal
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('restok-qty').focus();
+}
+
+function simpanRestok(id) {
+  const qtyEl     = document.getElementById('restok-qty');
+  const hppEl     = document.getElementById('restok-hpp');
+  const catatanEl = document.getElementById('restok-catatan');
+  const qty       = parseInt(qtyEl.value)     || 0;
+  const hppBaru   = parseFloat(hppEl.value)   || 0;
+  const catatan   = catatanEl.value.trim();
+
+  if (qty <= 0) { toast('Jumlah masuk harus lebih dari 0', 'error'); qtyEl.focus(); return; }
+
+  let produk = getData('produk', []);
+  const idx  = produk.findIndex(p => p.id === id);
+  if (idx < 0) { toast('Produk tidak ditemukan', 'error'); return; }
+
+  const stokLama = produk[idx].stok;
+  produk[idx].stok += qty;
+  if (hppBaru > 0) produk[idx].hpp = hppBaru;
+  setData('produk', produk);
+
+  const riwayatStok = getData('riwayat_stok', []);
+  riwayatStok.unshift({
+    id:           Date.now(),
+    produk_id:    id,
+    nama:         produk[idx].nama,
+    qty,
+    stok_sebelum: stokLama,
+    stok_sesudah: produk[idx].stok,
+    hpp_baru:     hppBaru || null,
+    catatan,
+    waktu:        new Date().toLocaleString('id-ID'),
+  });
+  localStorage.setItem('riwayat_stok', JSON.stringify(riwayatStok.slice(0, 200)));
+
+  document.getElementById('restok-overlay').remove();
+  renderProduk();
+  updateKritisCount();
+  toast(`Stok +${qty} berhasil dicatat ✓`, 'success');
+}
+
 // ===== CART =====
 function addToCart(id) {
   const p = getData('produk', []).find(x => x.id === id);
@@ -597,6 +682,7 @@ function addToCart(id) {
   if (existing) {
     if (existing.qty >= p.stok) { toast('Stok tidak cukup', 'error'); return; }
     existing.qty++;
+    existing.maxStok = p.stok; // FIX #2: selalu refresh maxStok dari storage terbaru
   } else {
     cart.push({ id, nama: p.nama, harga: p.harga, hpp: p.hpp || 0, qty: 1, maxStok: p.stok });
   }
@@ -622,6 +708,14 @@ function renderCart() {
     document.getElementById('btn-checkout').disabled = true;
     return;
   }
+
+  // FIX #2: refresh maxStok dari storage terbaru setiap kali render
+  const produkTerbaru = getData('produk', []);
+  cart.forEach(c => {
+    const p = produkTerbaru.find(x => x.id === c.id);
+    if (p) c.maxStok = p.stok;
+  });
+
   list.style.display  = 'flex';
   empty.style.display = 'none';
   document.getElementById('btn-checkout').disabled = false;
@@ -656,26 +750,34 @@ function removeCart(i) {
 
 function hitungDiskon(subtotal) {
   const dv = parseFloat(document.getElementById('diskon-val').value) || 0;
-  if (diskonMode === 'pct') {
-    return Math.round(subtotal * Math.min(100, Math.max(0, dv)) / 100);
-  } else {
-    return Math.min(dv, subtotal);
-  }
+  if (diskonMode === 'pct') return Math.round(subtotal * Math.min(100, Math.max(0, dv)) / 100);
+  return Math.min(dv, subtotal);
 }
 
 function hitungTotal() {
   const subtotal = cart.reduce((s, c) => s + c.harga * c.qty, 0);
   const diskon   = hitungDiskon(subtotal);
   const total    = Math.max(0, subtotal - diskon);
+
+  // FIX #1: simpan ke state numerik
+  _currentTotal = total;
+
   document.getElementById('co-subtotal').textContent = fmtRp(subtotal);
   document.getElementById('co-diskon').textContent   = '- ' + fmtRp(diskon);
   document.getElementById('co-total').textContent    = fmtRp(total);
+
+  const labaEstimasi = cart.reduce((s, c) => s + (c.harga - c.hpp) * c.qty, 0) - diskon;
+  const labaWarn     = document.getElementById('laba-warn');
+  if (labaWarn) {
+    labaWarn.style.display = labaEstimasi < 0 ? 'block' : 'none';
+    labaWarn.textContent   = `⚠️ Estimasi laba minus: ${fmtRp(labaEstimasi)}`;
+  }
   hitungKembalian();
 }
 
 function setDiskonMode(mode) {
   diskonMode = mode;
-  document.getElementById('diskon-rp').classList.toggle('active', mode === 'rp');
+  document.getElementById('diskon-rp').classList.toggle('active',  mode === 'rp');
   document.getElementById('diskon-pct').classList.toggle('active', mode === 'pct');
   hitungTotal();
 }
@@ -687,15 +789,15 @@ function setPayment(btn, method) {
   document.getElementById('tunai-section').style.display = method === 'tunai' ? 'block' : 'none';
 }
 
+// FIX #1: gunakan _currentTotal (state numerik), BUKAN parse DOM
 function hitungKembalian() {
-  const totalText = (document.getElementById('co-total').textContent || '0').replace(/\D/g, '');
-  const total = parseInt(totalText) || 0;
+  const total = _currentTotal;
   const bayar = parseFloat(document.getElementById('uang-bayar').value) || 0;
   const row   = document.getElementById('kembalian-row');
   if (bayar > 0) {
-    row.style.display = 'flex';
-    const kembalian   = bayar - total;
-    const valEl       = document.getElementById('kembalian-val');
+    row.style.display   = 'flex';
+    const kembalian     = bayar - total;
+    const valEl         = document.getElementById('kembalian-val');
     if (kembalian < 0) {
       valEl.textContent = '- ' + fmtRp(Math.abs(kembalian)) + ' ⚠️';
       valEl.style.color = 'var(--red)';
@@ -710,6 +812,9 @@ function hitungKembalian() {
 
 function checkout() {
   if (cart.length === 0) return;
+  if (_checkoutInProgress) { toast('Sedang memproses...', ''); return; }
+  _checkoutInProgress = true;
+
   const subtotal = cart.reduce((s, c) => s + c.harga * c.qty, 0);
   const diskon   = hitungDiskon(subtotal);
   const total    = Math.max(0, subtotal - diskon);
@@ -717,18 +822,33 @@ function checkout() {
   const bayar    = parseFloat(document.getElementById('uang-bayar').value) || 0;
 
   if (paymentMethod === 'tunai') {
-    if (bayar <= 0) { toast('Masukkan jumlah uang bayar', 'error'); return; }
+    if (bayar <= 0) {
+      toast('Masukkan jumlah uang bayar', 'error');
+      _checkoutInProgress = false;
+      return;
+    }
     if (bayar < total) {
       toast(`Uang bayar kurang ${fmtRp(total - bayar)}!`, 'error');
       const el = document.getElementById('uang-bayar');
       el.focus();
       el.style.outline = '2px solid var(--red)';
       setTimeout(() => { el.style.outline = ''; }, 2000);
+      _checkoutInProgress = false;
       return;
     }
   }
 
+  // Validasi stok dari storage terbaru
   let produk = getData('produk', []);
+  for (const c of cart) {
+    const p = produk.find(x => x.id === c.id);
+    if (!p || p.stok < c.qty) {
+      toast(`Stok ${c.nama} tidak cukup (tersisa ${p ? p.stok : 0})`, 'error');
+      _checkoutInProgress = false;
+      return;
+    }
+  }
+
   cart.forEach(c => {
     const idx = produk.findIndex(p => p.id === c.id);
     if (idx >= 0) {
@@ -748,7 +868,8 @@ function checkout() {
     bayar:     paymentMethod === 'tunai' ? bayar : total,
     kembalian: paymentMethod === 'tunai' ? Math.max(0, bayar - total) : 0,
     kasir,
-    laba: cart.reduce((s, c) => s + (c.harga - c.hpp) * c.qty, 0) - diskon,
+    laba:      cart.reduce((s, c) => s + (c.harga - c.hpp) * c.qty, 0) - diskon,
+    status:    'selesai',
   };
 
   const riwayat = getData('riwayat', []);
@@ -768,33 +889,169 @@ function checkout() {
   });
   setData('laporan', laporan);
 
+  lastTrx  = trx;
   lastNota = generateNota(trx);
   document.getElementById('nota-content').textContent = lastNota;
 
   const prefs = getData('prefs', {});
   if (prefs.auto_sheets) kirimSheets(trx);
 
-  cart = [];
+  localStorage.setItem('_last_kasir', kasir);
+
+  cart                = [];
+  _checkoutInProgress = false;
+  _currentTotal       = 0;
   updateCartBadge();
   renderCart();
   hitungTotal();
   document.getElementById('diskon-val').value = '';
   document.getElementById('uang-bayar').value = '';
-  document.getElementById('kasir-name').value = '';
 
   toast('✓ Transaksi berhasil!', 'success');
   openModal('modal-nota');
   renderProduk();
   updateKritisCount();
+
+  const prefs2 = getData('prefs', { stok_alert: true });
+  if (prefs2.stok_alert) cekStokKritisPaskaCheckout(trx.items);
 }
 
+function cekStokKritisPaskaCheckout(items) {
+  const produk = getData('produk', []);
+  const kritis = [];
+  items.forEach(item => {
+    const p = produk.find(x => x.id === item.id);
+    if (p && p.stok <= (p.minstok || 5)) kritis.push(`${p.nama} (sisa ${p.stok})`);
+  });
+  if (kritis.length > 0) {
+    setTimeout(() => toast(`⚠️ Stok kritis: ${kritis.join(', ')}`, 'error'), 1000);
+  }
+}
+
+// ===== VOID =====
+function voidTransaksi(trxId) {
+  const riwayat = getData('riwayat', []);
+  const trx     = riwayat.find(r => r.id === trxId);
+  if (!trx) { toast('Transaksi tidak ditemukan', 'error'); return; }
+  if (trx.status === 'void') { toast('Transaksi sudah dibatalkan', 'error'); return; }
+
+  // FIX #3: selisih waktu dihitung dari trx.id jika valid timestamp 13 digit,
+  // fallback ke parse string waktu agar kompatibel dengan data restore/import
+  let waktuTrx;
+  if (trx.id > 1e12) {
+    waktuTrx = trx.id; // trx.id adalah Date.now() saat checkout
+  } else {
+    // coba parse dari string waktu locale
+    const tglParsed = tglKeyFromLocale(trx.waktu);
+    waktuTrx = tglParsed ? new Date(tglParsed).getTime() : Date.now();
+  }
+
+  const selisihJam = (Date.now() - waktuTrx) / (1000 * 3600);
+  if (selisihJam > 24) {
+    toast('Void hanya bisa dilakukan dalam 24 jam setelah transaksi', 'error');
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id    = 'void-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.8);
+    z-index:99999;display:flex;align-items:center;justify-content:center;`;
+  overlay.innerHTML = `
+    <div style="background:#1a1a1a;border:2px solid #e74c3c;border-radius:16px;
+                padding:24px;max-width:340px;width:90%;color:#fff;font-family:inherit">
+      <div style="text-align:center;font-size:36px;margin-bottom:12px">🚫</div>
+      <h3 style="text-align:center;margin:0 0 8px;color:#e74c3c;font-size:16px">Batalkan Transaksi</h3>
+      <p style="font-size:13px;color:#aaa;text-align:center;margin:0 0 12px;line-height:1.5">
+        Total: <strong style="color:#f5c542">${fmtRp(trx.total)}</strong><br>
+        Waktu: ${trx.waktu}<br>Stok produk akan dikembalikan.
+      </p>
+      <label style="display:block;font-size:12px;color:#888;margin-bottom:5px">Alasan void *</label>
+      <input id="void-alasan" type="text" placeholder="contoh: Salah input qty"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:2px solid #444;
+               background:#111;color:#fff;font-size:14px;margin-bottom:16px;outline:none"/>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('void-overlay').remove()"
+          style="flex:1;padding:10px;border-radius:8px;border:1px solid #444;
+                 background:transparent;color:#888;font-size:14px;cursor:pointer">Batal</button>
+        <button onclick="konfirmasiVoid(${trxId})"
+          style="flex:1;padding:10px;border-radius:8px;border:none;
+                 background:#e74c3c;color:#fff;font-size:14px;font-weight:700;cursor:pointer">
+          Batalkan Trx
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('void-alasan').focus();
+}
+
+function konfirmasiVoid(trxId) {
+  const alasan = document.getElementById('void-alasan').value.trim();
+  if (!alasan) { toast('Isi alasan void', 'error'); return; }
+
+  let riwayat = getData('riwayat', []);
+  const idx   = riwayat.findIndex(r => r.id === trxId);
+  if (idx < 0) { toast('Transaksi tidak ditemukan', 'error'); return; }
+
+  const trx = riwayat[idx];
+  if (trx.status === 'void') { toast('Sudah dibatalkan', 'error'); return; }
+
+  let produk = getData('produk', []);
+  trx.items.forEach(item => {
+    const pidx = produk.findIndex(p => p.id === item.id);
+    if (pidx >= 0) {
+      produk[pidx].stok    = (produk[pidx].stok    || 0) + item.qty;
+      produk[pidx].terjual = Math.max(0, (produk[pidx].terjual || 0) - item.qty);
+    }
+  });
+  setData('produk', produk);
+
+  const tglTrx = tglKeyFromLocale(trx.waktu);
+  if (tglTrx) {
+    const laporan = getData('laporan', {});
+    if (laporan[tglTrx]) {
+      laporan[tglTrx].omzet = Math.max(0, laporan[tglTrx].omzet - trx.total);
+      laporan[tglTrx].laba  = laporan[tglTrx].laba - trx.laba;
+      laporan[tglTrx].trx   = Math.max(0, laporan[tglTrx].trx - 1);
+    }
+    setData('laporan', laporan);
+  }
+
+  riwayat[idx] = {
+    ...trx,
+    status:      'void',
+    void_alasan: alasan,
+    void_waktu:  new Date().toLocaleString('id-ID'),
+  };
+  setData('riwayat', riwayat);
+
+  document.getElementById('void-overlay').remove();
+  renderRiwayat();
+  renderProduk();
+  renderDashboard();
+  toast('Transaksi berhasil dibatalkan ✓', 'success');
+}
+
+function tglKeyFromLocale(waktuStr) {
+  try {
+    const match = waktuStr.match(/(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})/);
+    if (match) {
+      const [, dd, mm, yyyy] = match;
+      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    }
+  } catch (e) { /* */ }
+  return null;
+}
+
+// ===== NOTA =====
 function generateNota(trx) {
   const s      = getData('settings', {});
   const w      = 32;
   const center = str => ' '.repeat(Math.max(0, Math.floor((w - str.length) / 2))) + str;
   const line   = '─'.repeat(w);
   let n = '';
-  n += center(s.nama || 'dityaMotor 88') + '\n';
+  n += center(s.nama  || 'dityaMotor 88') + '\n';
   if (s.alamat) n += center(s.alamat) + '\n';
   if (s.telp)   n += center('Telp: ' + s.telp) + '\n';
   n += line + '\n';
@@ -805,7 +1062,7 @@ function generateNota(trx) {
   n += `Subtotal : ${fmtRp(trx.subtotal)}\n`;
   if (trx.diskon > 0) n += `Diskon   : - ${fmtRp(trx.diskon)}\n`;
   n += `TOTAL    : ${fmtRp(trx.total)}\n`;
-  if (trx.metode === 'tunai') { n += `Bayar    : ${fmtRp(trx.bayar)}\nKembali  : ${fmtRp(trx.kembalian)}\n`; }
+  if (trx.metode === 'tunai') n += `Bayar    : ${fmtRp(trx.bayar)}\nKembali  : ${fmtRp(trx.kembalian)}\n`;
   n += line + '\n';
   n += center(s.footer1 || 'Terima kasih telah berbelanja!') + '\n';
   if (s.footer2) n += center(s.footer2) + '\n';
@@ -819,7 +1076,7 @@ function cetakNotaTerakhir() {
 
 async function shareNota() {
   if (navigator.share) {
-    try { await navigator.share({ title: 'Struk Transaksi', text: lastNota }); } catch (e) { }
+    try { await navigator.share({ title: 'Struk Transaksi', text: lastNota }); } catch (e) { /* */ }
   } else {
     navigator.clipboard.writeText(lastNota).then(() => toast('Struk disalin ke clipboard ✓'));
   }
@@ -845,13 +1102,23 @@ function updateKritisCount() {
   const list = document.getElementById('kritis-list');
   if (kritis.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div>Semua stok aman</div>';
-  } else {
-    list.innerHTML = kritis.map(p => `
-      <div class="kritis-item">
-        <div><div class="kritis-name">${p.nama}</div><div class="kritis-stok">${p.stok} unit tersisa</div></div>
-        <span class="badge-kritis">${p.stok <= 0 ? 'HABIS' : 'KRITIS'}</span>
-      </div>`).join('');
+    return;
   }
+  list.innerHTML = kritis.map(p => `
+    <div class="kritis-item">
+      <div>
+        <div class="kritis-name">${p.nama}</div>
+        <div class="kritis-stok">${p.stok} unit tersisa</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="badge-kritis">${p.stok <= 0 ? 'HABIS' : 'KRITIS'}</span>
+        <button onclick="openRestok(${p.id})"
+          style="padding:4px 8px;border-radius:6px;border:1px solid #f5c542;
+                 background:transparent;color:#f5c542;font-size:11px;cursor:pointer">
+          +Stok
+        </button>
+      </div>
+    </div>`).join('');
 }
 
 function renderChart() {
@@ -869,28 +1136,33 @@ function renderChart() {
   chartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: days,
+      labels:   days,
       datasets: [
-        { label: 'Omzet', data: omzetData, backgroundColor: 'rgba(245,197,66,0.7)', borderRadius: 4 },
-        { label: 'Laba',  data: labaData,  backgroundColor: 'rgba(76,175,125,0.7)',  borderRadius: 4 }
-      ]
+        { label: 'Omzet', data: omzetData, backgroundColor: 'rgba(245,197,66,0.7)',  borderRadius: 4 },
+        { label: 'Laba',  data: labaData,  backgroundColor: 'rgba(76,175,125,0.7)',  borderRadius: 4 },
+      ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { color: '#2e2e2e' }, ticks: { color: '#5a5550', font: { size: 10 } } },
-        y: { grid: { color: '#2e2e2e' }, ticks: { color: '#5a5550', font: { size: 10 }, callback: v => fmtRpShort(v) } }
-      }
-    }
+        y: {
+          grid:  { color: '#2e2e2e' },
+          ticks: { color: '#5a5550', font: { size: 10 }, callback: v => fmtRpShort(v) },
+        },
+      },
+    },
   });
 }
 
 function renderTerlaris() {
-  const laporan = getData('laporan', {});
-  const now     = new Date();
-  const bulan   = now.getMonth(), tahun = now.getFullYear();
+  const laporan      = getData('laporan', {});
+  const now          = new Date();
+  const bulan        = now.getMonth();
+  const tahun        = now.getFullYear();
   const totalTerjual = {};
+
   Object.entries(laporan).forEach(([tgl, data]) => {
     let d;
     if (tgl.includes('-')) {
@@ -900,13 +1172,14 @@ function renderTerlaris() {
       if (parts.length === 3) d = new Date(parts[2], parts[1] - 1, parts[0]);
     }
     if (d && d.getMonth() === bulan && d.getFullYear() === tahun) {
-      Object.entries(data.terlaris || {}).forEach(([key, val]) => {
-        const nama = (typeof val === 'object') ? val.nama : key.replace(/_/g, ' ');
-        const qty  = (typeof val === 'object') ? val.qty  : val;
+      Object.entries(data.terlaris || {}).forEach(([, val]) => {
+        const nama = typeof val === 'object' ? val.nama : String(val);
+        const qty  = typeof val === 'object' ? val.qty  : 1;
         totalTerjual[nama] = (totalTerjual[nama] || 0) + qty;
       });
     }
   });
+
   const sorted = Object.entries(totalTerjual).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const el     = document.getElementById('terlaris-list');
   if (sorted.length === 0) {
@@ -925,6 +1198,7 @@ function renderLaporan() {
   const laporan = getData('laporan', {});
   const dari    = document.getElementById('date-dari').value;
   const sampai  = document.getElementById('date-sampai').value;
+
   const entries = Object.entries(laporan).map(([tgl, data]) => {
     let iso, display;
     if (tgl.includes('-')) {
@@ -932,12 +1206,20 @@ function renderLaporan() {
       display = tglDisplay(tgl);
     } else {
       const parts = tgl.split('/');
-      iso     = parts.length === 3 ? `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}` : '';
-      display = tgl;
+      if (parts.length === 3 && parts[2].length === 4) {
+        iso     = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        display = tgl;
+      } else {
+        iso     = null; // FIX #5: null, bukan string kosong
+        display = tgl;
+      }
     }
     return { tgl: display, iso, ...data };
-  }).filter(e => (!dari || e.iso >= dari) && (!sampai || e.iso <= sampai))
-    .sort((a, b) => b.iso.localeCompare(a.iso));
+  }).filter(e => {
+    // FIX #5: data dengan iso null TIDAK lolos filter tanggal (skip, jangan tampilkan)
+    if (!e.iso) return false;
+    return (!dari || e.iso >= dari) && (!sampai || e.iso <= sampai);
+  }).sort((a, b) => b.iso.localeCompare(a.iso));
 
   const tbody = document.getElementById('laporan-tbody');
   if (entries.length === 0) {
@@ -945,10 +1227,13 @@ function renderLaporan() {
     return;
   }
   tbody.innerHTML = entries.map(e => {
-    const terlarisEntries = Object.entries(e.terlaris || {});
-    const terlaris = terlarisEntries
-      .map(([k, v]) => [(typeof v === 'object') ? v.nama : k.replace(/_/g,' '), (typeof v === 'object') ? v.qty : v])
-      .sort((a, b) => b[1] - a[1])[0];
+    const terlarisArr = Object.entries(e.terlaris || {})
+      .map(([k, v]) => [
+        typeof v === 'object' ? v.nama : k.replace(/_/g, ' '),
+        typeof v === 'object' ? v.qty  : v,
+      ])
+      .sort((a, b) => b[1] - a[1]);
+    const terlaris = terlarisArr[0];
     return `<tr>
       <td>${e.tgl}</td>
       <td style="color:var(--accent)">${fmtRpShort(e.omzet)}</td>
@@ -968,7 +1253,7 @@ function resetDateFilter() {
 }
 
 function renderRiwayat() {
-  const riwayat   = getData('riwayat', []);
+  const riwayat  = getData('riwayat', []);
   const filterPay = document.getElementById('filter-payment').value;
   const filtered  = filterPay ? riwayat.filter(r => r.metode === filterPay) : riwayat;
   const el        = document.getElementById('riwayat-list');
@@ -976,20 +1261,39 @@ function renderRiwayat() {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">🧾</div>Belum ada transaksi</div>';
     return;
   }
-  el.innerHTML = filtered.map(r => `
-    <div class="riwayat-item">
+  el.innerHTML = filtered.map(r => {
+    const isVoid    = r.status === 'void';
+    const voidBadge = isVoid
+      ? `<span style="font-size:10px;background:#e74c3c22;color:#e74c3c;padding:2px 6px;
+                      border-radius:4px;margin-left:6px">VOID</span>` : '';
+    const voidInfo  = isVoid
+      ? `<div style="font-size:11px;color:#e74c3c;margin-top:4px">Dibatalkan: ${r.void_alasan || '-'}</div>` : '';
+    const voidBtn   = !isVoid
+      ? `<button onclick="voidTransaksi(${r.id})"
+           style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid #e74c3c55;
+                  background:transparent;color:#e74c3c;cursor:pointer;margin-top:6px">
+           🚫 Void
+         </button>` : '';
+    return `
+    <div class="riwayat-item" style="${isVoid ? 'opacity:0.6' : ''}">
       <div class="riwayat-header">
         <div>
-          <div style="font-size:13px;font-weight:600">${r.kasir}</div>
+          <div style="font-size:13px;font-weight:600">${r.kasir}${voidBadge}</div>
           <div class="riwayat-waktu">${r.waktu}</div>
         </div>
         <div style="text-align:right">
-          <div class="riwayat-total">${fmtRp(r.total)}</div>
+          <div class="riwayat-total"
+            style="${isVoid ? 'text-decoration:line-through;color:var(--text3)' : ''}">${fmtRp(r.total)}</div>
           <span class="badge-payment ${r.metode}">${r.metode.toUpperCase()}</span>
         </div>
       </div>
-      <div class="riwayat-detail">${r.items.map(i => `${i.nama} ×${i.qty}`).join(' · ')}${r.diskon > 0 ? `<br>Diskon: ${fmtRp(r.diskon)}` : ''}</div>
-    </div>`).join('');
+      <div class="riwayat-detail">
+        ${r.items.map(i => `${i.nama} ×${i.qty}`).join(' · ')}
+        ${r.diskon > 0 ? `<br>Diskon: ${fmtRp(r.diskon)}` : ''}
+      </div>
+      ${voidInfo}${voidBtn}
+    </div>`;
+  }).join('');
 }
 
 // ===== EXPORT =====
@@ -998,7 +1302,7 @@ function exportCSV() {
   let csv = 'Tanggal,Omzet,Laba,Transaksi,Terlaris\n';
   Object.entries(laporan).forEach(([tgl, d]) => {
     const terlarisArr = Object.entries(d.terlaris || {})
-      .map(([k, v]) => [(typeof v === 'object') ? v.nama : k.replace(/_/g,' '), (typeof v === 'object') ? v.qty : v])
+      .map(([k, v]) => [typeof v === 'object' ? v.nama : k.replace(/_/g, ' '), typeof v === 'object' ? v.qty : v])
       .sort((a, b) => b[1] - a[1]);
     const terlarisNama = terlarisArr.length ? terlarisArr[0][0] : '-';
     csv += `${tgl},${d.omzet},${d.laba},${d.trx},"${terlarisNama}"\n`;
@@ -1019,9 +1323,9 @@ function exportTXT() {
 
 function exportJSON() {
   const data = {
-    produk:      getData('produk', []),
-    laporan:     getData('laporan', {}),
-    riwayat:     getData('riwayat', []),
+    produk:      getData('produk',   []),
+    laporan:     getData('laporan',  {}),
+    riwayat:     getData('riwayat',  []),
     settings:    getData('settings', {}),
     backup_date: new Date().toISOString(),
   };
@@ -1036,60 +1340,144 @@ function restoreJSON(e) {
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
+      if (!data.produk && !data.laporan && !data.riwayat) {
+        toast('File backup tidak valid atau kosong', 'error');
+        return;
+      }
       if (data.produk)   setData('produk',   data.produk);
       if (data.laporan)  setData('laporan',  data.laporan);
       if (data.riwayat)  setData('riwayat',  data.riwayat);
       if (data.settings) setData('settings', data.settings);
       toast('Data berhasil direstore ✓', 'success');
       initApp();
-    } catch { toast('File tidak valid', 'error'); }
+    } catch { toast('File tidak valid atau rusak', 'error'); }
   };
   reader.readAsText(file);
   e.target.value = '';
 }
 
 function downloadFile(name, content, type) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([content], { type }));
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([content], { type }));
   a.download = name;
   a.click();
 }
 
+// FIX #4: kirimSheets dengan AbortController timeout 10 detik
 async function kirimSheets(trxData) {
   const s = getData('settings', {});
   if (!s.sheets_url) { toast('URL Sheets belum diset', 'error'); return; }
+  const controller = new AbortController();
+  const timer      = setTimeout(() => controller.abort(), 10000);
   try {
     const data = trxData || getData('riwayat', [])[0];
     if (!data) { toast('Tidak ada data transaksi', 'error'); return; }
-    await fetch(s.sheets_url, { method: 'POST', body: JSON.stringify({ action: 'addTransaction', data }) });
+    await fetch(s.sheets_url, {
+      method: 'POST',
+      body:   JSON.stringify({ action: 'addTransaction', data }),
+      signal: controller.signal,
+    });
     toast('Terkirim ke Sheets ✓', 'success');
-  } catch { toast('Gagal kirim ke Sheets', 'error'); }
+  } catch (err) {
+    if (err.name === 'AbortError') toast('Kirim ke Sheets timeout (>10 detik)', 'error');
+    else toast('Gagal kirim ke Sheets', 'error');
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function tesSheets() {
   const url = document.getElementById('set-sheets-url').value;
   if (!url) { toast('URL belum diisi', 'error'); return; }
+  const controller = new AbortController();
+  const timer      = setTimeout(() => controller.abort(), 10000);
   try {
     toast('Menghubungkan...');
-    await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'ping' }) });
+    await fetch(url, {
+      method: 'POST',
+      body:   JSON.stringify({ action: 'ping' }),
+      signal: controller.signal,
+    });
     toast('Koneksi berhasil ✓', 'success');
     updateSheetsStatus(true);
-  } catch { toast('Gagal terhubung', 'error'); }
+  } catch (err) {
+    if (err.name === 'AbortError') toast('Koneksi timeout (>10 detik)', 'error');
+    else toast('Gagal terhubung', 'error');
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function resetLaporan() {
-  if (!confirm('Reset semua laporan harian?')) return;
-  setData('laporan', {});
-  renderLaporan();
-  renderDashboard();
-  toast('Laporan direset');
+  showKonfirmasiHapus(
+    'Reset Laporan Harian',
+    'Semua data laporan harian akan dihapus permanen.',
+    'RESET LAPORAN',
+    () => {
+      setData('laporan', {});
+      renderLaporan();
+      renderDashboard();
+      toast('Laporan direset');
+    }
+  );
 }
 
 function resetRiwayat() {
-  if (!confirm('Hapus semua riwayat transaksi?')) return;
-  setData('riwayat', []);
-  renderRiwayat();
-  toast('Riwayat dihapus');
+  showKonfirmasiHapus(
+    'Hapus Riwayat Transaksi',
+    'Semua riwayat transaksi akan dihapus permanen.',
+    'HAPUS RIWAYAT',
+    () => {
+      setData('riwayat', []);
+      renderRiwayat();
+      toast('Riwayat dihapus');
+    }
+  );
+}
+
+function showKonfirmasiHapus(judul, pesan, katakunci, onKonfirm) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.8);
+    z-index:99999;display:flex;align-items:center;justify-content:center;`;
+  overlay.innerHTML = `
+    <div style="background:#1a1a1a;border:2px solid #e74c3c;border-radius:16px;
+                padding:24px;max-width:340px;width:90%;text-align:center;color:#fff;font-family:inherit">
+      <div style="font-size:36px;margin-bottom:10px">⚠️</div>
+      <h3 style="margin:0 0 8px;color:#e74c3c;font-size:16px">${judul}</h3>
+      <p style="font-size:13px;color:#ccc;margin:0 0 14px;line-height:1.5">${pesan}</p>
+      <p style="font-size:12px;color:#aaa;margin:0 0 8px">
+        Ketik <strong style="color:#f5c542">${katakunci}</strong> untuk konfirmasi:
+      </p>
+      <input id="konfirm-input" type="text" placeholder="Ketik di sini..."
+        style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:2px solid #555;
+               background:#111;color:#fff;font-size:13px;text-align:center;outline:none;margin-bottom:14px"/>
+      <div style="display:flex;gap:8px">
+        <button id="konfirm-cancel"
+          style="flex:1;padding:10px;border-radius:8px;border:none;
+                 background:#444;color:#fff;font-size:13px;cursor:pointer">Batal</button>
+        <button id="konfirm-ok" disabled
+          style="flex:1;padding:10px;border-radius:8px;border:none;
+                 background:#666;color:#aaa;font-size:13px;cursor:not-allowed">Konfirmasi</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const input     = overlay.querySelector('#konfirm-input');
+  const okBtn     = overlay.querySelector('#konfirm-ok');
+  const cancelBtn = overlay.querySelector('#konfirm-cancel');
+
+  input.addEventListener('input', () => {
+    const valid            = input.value.trim() === katakunci;
+    okBtn.disabled         = !valid;
+    okBtn.style.background = valid ? '#e74c3c' : '#666';
+    okBtn.style.color      = valid ? '#fff'    : '#aaa';
+    okBtn.style.cursor     = valid ? 'pointer' : 'not-allowed';
+  });
+  okBtn.addEventListener('click',    () => { overlay.remove(); onKonfirm(); });
+  cancelBtn.addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click',  e => { if (e.target === overlay) overlay.remove(); });
+  setTimeout(() => input.focus(), 100);
 }
 
 function resetAllData() {
@@ -1129,8 +1517,8 @@ function resetAllData() {
         </button>
       </div>
     </div>`;
-
   document.body.appendChild(overlay);
+
   const input      = document.getElementById('reset-confirm-input');
   const confirmBtn = document.getElementById('reset-confirm-btn');
   const cancelBtn  = document.getElementById('reset-cancel-btn');
@@ -1142,14 +1530,17 @@ function resetAllData() {
     confirmBtn.style.color      = valid ? '#fff'    : '#aaa';
     confirmBtn.style.cursor     = valid ? 'pointer' : 'not-allowed';
   });
-
   confirmBtn.addEventListener('click', () => {
     overlay.remove();
-    ['produk','laporan','riwayat'].forEach(k => localStorage.removeItem(k));
+    // FIX #6: ikutkan 'prefs' dan '_last_kasir' saat reset semua
+    ['produk', 'laporan', 'riwayat', 'riwayat_stok', 'prefs', '_last_kasir']
+      .forEach(k => localStorage.removeItem(k));
     window.produk  = [];
     window.laporan = {};
     window.riwayat = [];
-    cart = [];
+    cart                = [];
+    _checkoutInProgress = false;
+    _currentTotal       = 0;
     updateCartBadge();
     renderCart();
     initApp();
@@ -1158,31 +1549,6 @@ function resetAllData() {
   cancelBtn.addEventListener('click',  () => overlay.remove());
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   setTimeout(() => input.focus(), 100);
-}
-
-// ===== UTILS =====
-function tglKey(date) {
-  const d = date || new Date();
-  return d.toISOString().split('T')[0];
-}
-function tglDisplay(isoKey) {
-  const [y, m, dd] = isoKey.split('-');
-  return `${parseInt(dd)}/${parseInt(m)}/${y}`;
-}
-
-function fmtRp(n) { return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID'); }
-function fmtRpShort(n) {
-  n = Math.round(n || 0);
-  if (n >= 1000000) return 'Rp ' + (n / 1000000).toFixed(1) + 'jt';
-  if (n >= 1000)    return 'Rp ' + Math.floor(n / 1000) + 'rb';
-  return 'Rp ' + n;
-}
-
-function toast(msg, type = '') {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className   = 'toast show ' + type;
-  setTimeout(() => el.className = 'toast', 2500);
 }
 
 // ===== AUTH =====
@@ -1202,11 +1568,8 @@ async function doLogin() {
   if (!email || !password) { errEl.textContent = 'Email & password wajib diisi'; return; }
   errEl.textContent = 'Memproses...';
   const result = await window.fbLogin(email, password);
-  if (result.ok) {
-    showScreen('pin');
-  } else {
-    errEl.textContent = result.error;
-  }
+  if (result.ok) showScreen('pin');
+  else errEl.textContent = result.error;
 }
 
 async function doRegister() {
@@ -1214,9 +1577,9 @@ async function doRegister() {
   const email    = document.getElementById('reg-email').value.trim();
   const password = document.getElementById('reg-password').value;
   const errEl    = document.getElementById('reg-error');
-  if (!nama)     { errEl.textContent = 'Nama toko wajib diisi'; return; }
-  if (!email)    { errEl.textContent = 'Email wajib diisi'; return; }
-  if (!password) { errEl.textContent = 'Password wajib diisi'; return; }
+  if (!nama)     { errEl.textContent = 'Nama toko wajib diisi';   return; }
+  if (!email)    { errEl.textContent = 'Email wajib diisi';        return; }
+  if (!password) { errEl.textContent = 'Password wajib diisi';     return; }
   errEl.textContent = 'Mendaftarkan...';
   const result = await window.fbRegister(email, password);
   if (result.ok) {
@@ -1236,23 +1599,30 @@ function logoutAkun() {
   if (!confirm('Yakin ingin logout dari akun?')) return;
   window._pinPassed = false;
   if (window.FB && typeof window.fbLogout === 'function') window.fbLogout();
-  ['produk', 'laporan', 'riwayat', 'settings', 'prefs',
-   'pin', '_pin_sudah_diganti', '_pin_attempts', '_pin_lock_until'].forEach(k => {
-    localStorage.removeItem(k);
-  });
+
+  // FIX #6: logout bersihkan SEMUA key termasuk prefs & _last_kasir
+  [
+    'produk', 'laporan', 'riwayat', 'settings', 'prefs',
+    'pin', '_pin_sudah_diganti', '_pin_attempts', '_pin_lock_until',
+    '_last_kasir', 'riwayat_stok',
+  ].forEach(k => localStorage.removeItem(k));
 
   window.produk     = [];
   window.laporan    = {};
   window.riwayat    = [];
   window.pengaturan = {};
 
-  cart          = [];
-  diskonMode    = 'rp';
-  paymentMethod = 'tunai';
-  lastNota      = '';
-  produkFilter  = 'Semua';
+  cart                = [];
+  diskonMode          = 'rp';
+  paymentMethod       = 'tunai';
+  lastNota            = '';
+  lastTrx             = null;
+  produkFilter        = 'Semua';
+  _checkoutInProgress = false;
+  _currentTotal       = 0;
   updateCartBadge();
-  ['diskon-val','uang-bayar','kasir-name'].forEach(id => {
+
+  ['diskon-val', 'uang-bayar', 'kasir-name'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1272,11 +1642,32 @@ async function lupaPassword() {
   if (!email) { errEl.textContent = 'Masukkan email dulu sebelum reset password'; return; }
   errEl.textContent = 'Mengirim email reset...';
   const result = await window.fbResetPassword(email);
-  if (result.ok) {
-    errEl.style.color = 'var(--green)';
-    errEl.textContent = '✓ Email reset password sudah dikirim, cek inbox kamu';
-  } else {
-    errEl.style.color = 'var(--red)';
-    errEl.textContent = result.error;
-  }
+  errEl.style.color = result.ok ? 'var(--green)' : 'var(--red)';
+  errEl.textContent  = result.ok
+    ? '✓ Email reset password sudah dikirim, cek inbox kamu'
+    : result.error;
+}
+
+// ===== UTILS =====
+function tglKey(date) {
+  return (date || new Date()).toISOString().split('T')[0];
+}
+function tglDisplay(isoKey) {
+  const [y, m, dd] = isoKey.split('-');
+  return `${parseInt(dd)}/${parseInt(m)}/${y}`;
+}
+function fmtRp(n) {
+  return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID');
+}
+function fmtRpShort(n) {
+  n = Math.round(n || 0);
+  if (n >= 1000000) return 'Rp ' + (n / 1000000).toFixed(1) + 'jt';
+  if (n >= 1000)    return 'Rp ' + Math.floor(n / 1000) + 'rb';
+  return 'Rp ' + n;
+}
+function toast(msg, type = '') {
+  const el       = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'toast show ' + type;
+  setTimeout(() => { el.className = 'toast'; }, 2500);
 }
