@@ -68,7 +68,7 @@ window.resetCartState = function () {
   _checkoutInProgress = false;
   _currentTotal       = 0;
   updateCartBadge();
-  ['diskon-val', 'uang-bayar'].forEach(id => {
+ ['diskon-val', 'uang-bayar', 'mekanik-name'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -506,7 +506,7 @@ function updateSheetsStatus(connected) {
 function getCatIcon(cat) {
   const icons = {
     'Oli': '🛢️', 'Spare Part': '⚙️', 'Aksesoris': '🔩',
-    'Ban': '🔄', 'Aki': '🔋', 'Lainnya': '📦',
+    'Ban': '🔄', 'Aki': '🔋', 'Lainnya': '📦', 'Jasa Servis': '🔧',
   };
   return icons[cat] || '📦';
 }
@@ -872,6 +872,7 @@ function checkout() {
   const diskon   = hitungDiskon(subtotal, snapshotDiskonMode);
   const total    = Math.max(0, subtotal - diskon);
   const kasir    = document.getElementById('kasir-name').value || 'Kasir';
+  const mekanik = document.getElementById('mekanik-name').value || '';
   const bayar    = parseFloat(document.getElementById('uang-bayar').value) || 0;
 
   if (paymentMethod === 'tunai') {
@@ -920,6 +921,7 @@ function checkout() {
     bayar:     paymentMethod === 'tunai' ? bayar : total,
     kembalian: paymentMethod === 'tunai' ? Math.max(0, bayar - total) : 0,
     kasir,
+    mekanik,
     laba:      cart.reduce((s, c) => s + (c.harga - c.hpp) * c.qty, 0) - diskon,
     status:    'selesai',
   };
@@ -1131,7 +1133,9 @@ function generateNota(trx) {
   if (s.alamat) n += center(s.alamat) + '\n';
   if (s.telp)   n += center('Telp: ' + s.telp) + '\n';
   n += line + '\n';
-  n += `Waktu : ${trx.waktu}\nKasir : ${trx.kasir}\nMetode: ${trx.metode.toUpperCase()}\n`;
+  n += `Waktu   : ${trx.waktu}\nKasir   : ${trx.kasir}\n`;
+if (trx.mekanik) n += `Mekanik : ${trx.mekanik}\n`;
+n += `Metode  : ${trx.metode.toUpperCase()}\n`;
   n += line + '\n';
   trx.items.forEach(i => {
     n += `${i.nama}\n  ${i.qty} × ${fmtRp(i.harga)} = ${fmtRp(i.harga * i.qty)}\n`;
@@ -1725,7 +1729,7 @@ function logoutAkun() {
   updateCartBadge();
   renderCart(); // pastikan tampilan cart bersih
 
-  ['diskon-val', 'uang-bayar', 'kasir-name'].forEach(id => {
+  ['diskon-val', 'uang-bayar', 'kasir-name', 'mekanik-name'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
