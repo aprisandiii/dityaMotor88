@@ -1157,7 +1157,7 @@ function tglKeyFromLocale(waktuStr) {
 function generateNota(trx) {
   const s      = getData('settings', {});
   const prefs  = getData('prefs', { show_laba: false });
-  const w      = 42;
+  const w      = 32;
 const center = str => ' '.repeat(Math.max(0, Math.floor((w - str.length) / 2))) + str;
 const line   = '================================';
 const dash   = '--------------------------------';
@@ -1191,7 +1191,7 @@ const dash   = '--------------------------------';
   }
   n += center(s.footer1 || 'Terima kasih!') + '\n';
   if (s.footer2) {
-    const f2 = s.footer2.length > 32 ? s.footer2.substring(0, 32) : s.footer2;
+    const f2 = s.footer2.length > 30 ? s.footer2.substring(0, 30) + '..' : s.footer2;
     n += center(f2) + '\n';
   }
   return n;
