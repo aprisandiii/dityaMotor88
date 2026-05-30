@@ -388,19 +388,22 @@
       return;
     }
     global.Swal.fire({
-      title              : 'Upgrade Diperlukan',
-      html               : `<p style="color:#aaa;font-size:14px">${msg}</p>
-                            <p style="color:#aaa;font-size:13px;margin-top:8px">
-                            Beli kode aktivasi via WhatsApp dan unlock semua fitur!</p>`,
-      icon               : 'warning',
-      background         : '#1a1a1a',
-      color              : '#f0ece6',
-      confirmButtonColor : '#f5c542',
-      confirmButtonText  : '💬 Beli Sekarang',
-      showCancelButton   : true,
-      cancelButtonText   : 'Nanti',
-      cancelButtonColor  : '#333',
-    }).then(r => { if (r.isConfirmed) beliLisensi(); });
+  title              : 'Upgrade Diperlukan',
+  html               : `<p style="color:#aaa;font-size:14px">${msg}</p>
+                        <p style="color:#aaa;font-size:13px;margin-top:8px">
+                        Beli kode aktivasi via WhatsApp dan unlock semua fitur!</p>`,
+  icon               : 'warning',
+  background         : '#1a1a1a',
+  color              : '#f0ece6',
+  confirmButtonColor : '#f5c542',
+  confirmButtonText  : '💬 Beli Sekarang',
+  showCancelButton   : true,
+  cancelButtonText   : 'Nanti',
+  cancelButtonColor  : '#333',
+  target             : document.body,
+  backdrop           : true,
+  scrollbarPadding   : false,
+}).then(r => { if (r.isConfirmed) beliLisensi(); });
   }
 
   // ── GUARD FUNCTIONS ────────────────────────────────────────────────
