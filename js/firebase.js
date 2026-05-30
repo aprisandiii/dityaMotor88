@@ -321,7 +321,10 @@ window.bukaLoginFirebase = function() {
       html: `<p style="color:#8892a4;font-size:13px">Realtime sync akan berhenti.<br>Data lokal tetap aman.</p>`,
       icon: 'question', background: '#171b24', color: '#e8eaf0',
       showCancelButton: true, confirmButtonText: 'Ya, Keluar',
-      confirmButtonColor: '#ef4444', cancelButtonText: 'Batal'
+      confirmButtonColor: '#ef4444', cancelButtonText: 'Batal',
+      target: document.body,
+      backdrop: true,
+      scrollbarPadding: false,
     }).then(r => { if (r.isConfirmed) window.fbLogout(); });
     return;
   }
