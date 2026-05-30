@@ -1376,6 +1376,7 @@ function renderLaporan() {
       <td style="color:var(--text2)">${terlaris ? terlaris[0] : '-'}</td>
     </tr>`;
   }).join('');
+  renderLaporanMekanik();
 }
 
 function resetDateFilter() {
@@ -1388,9 +1389,15 @@ function resetDateFilter() {
 
 // F1: renderRiwayat — pakai class .is-void bukan inline style opacity
 function renderRiwayat() {
-  const riwayat  = getData('riwayat', []);
-  const filterPay = document.getElementById('filter-payment').value;
-  const filtered  = filterPay ? riwayat.filter(r => r.metode === filterPay) : riwayat;
+  const riwayat    = getData('riwayat', []);
+  const filterPay  = document.getElementById('filter-payment').value;
+  const filterMek  = (document.getElementById('filter-mekanik')?.value || '').toLowerCase().trim();
+  let filtered     = filterPay ? riwayat.filter(r => r.metode === filterPay) : riwayat;
+  if (filterMek) {
+    filtered = filtered.filter(r =>
+      r.items.some(i => i.isJasa && i.mekanik && i.mekanik.toLowerCase().includes(filterMek))
+    );
+  }
   const el        = document.getElementById('riwayat-list');
   if (filtered.length === 0) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">🧾</div>Belum ada transaksi</div>';
@@ -1430,8 +1437,50 @@ function renderRiwayat() {
       ${voidInfo}${voidBtn}
     </div>`;
   }).join('');
+  renderLaporanMekanik();
 }
+function renderLaporanMekanik() {
+  const riwayat = getData('riwayat', []);
+  const now     = new Date();
+  const bulan   = now.getMonth();
+  const tahun   = now.getFullYear();
+  const data    = {};
 
+  riwayat.forEach(trx => {
+    if (trx.status === 'void') return;
+    const tgl = tglKeyFromLocale(trx.waktu);
+    if (!tgl) return;
+    const d = new Date(tgl);
+    if (d.getMonth() !== bulan || d.getFullYear() !== tahun) return;
+
+    trx.items.forEach(item => {
+      if (!item.isJasa || !item.mekanik) return;
+      const m = item.mekanik;
+      if (!data[m]) data[m] = { nama: m, totalJasa: 0, jumlah: 0 };
+      data[m].totalJasa += item.harga * item.qty;
+      data[m].jumlah++;
+    });
+  });
+
+  const el     = document.getElementById('laporan-mekanik-list');
+  const sorted = Object.values(data).sort((a, b) => b.totalJasa - a.totalJasa);
+
+  if (sorted.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🔧</div>Belum ada data jasa bulan ini</div>';
+    return;
+  }
+
+  el.innerHTML = sorted.map(m => `
+    <div class="kritis-item" style="margin-bottom:8px">
+      <div>
+        <div class="kritis-name">🔧 ${m.nama}</div>
+        <div style="font-size:11px;color:var(--text3)">${m.jumlah} pekerjaan</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:14px;font-weight:700;color:var(--accent)">${fmtRp(m.totalJasa)}</div>
+      </div>
+    </div>`).join('');
+}
 // ===== EXPORT =====
 function exportCSV() {
   const laporan = getData('laporan', {});
