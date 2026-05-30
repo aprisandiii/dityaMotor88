@@ -923,6 +923,7 @@ function checkout() {
 
   let produk = getData('produk', []);
   for (const c of cart) {
+    if (c.isJasa) continue; // jasa tidak perlu cek stok
     const p = produk.find(x => x.id === c.id);
     if (!p || p.stok < c.qty) {
       toast(`Stok ${c.nama} tidak cukup (tersisa ${p ? p.stok : 0})`, 'error');
