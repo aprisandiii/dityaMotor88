@@ -1191,8 +1191,17 @@ const dash   = '--------------------------------';
   }
   n += center(s.footer1 || 'Terima kasih!') + '\n';
   if (s.footer2) {
-    const f2 = s.footer2.length > 30 ? s.footer2.substring(0, 30) + '..' : s.footer2;
-    n += center(f2) + '\n';
+    const words = s.footer2.split(' ');
+    let baris = '';
+    words.forEach(word => {
+      if ((baris + ' ' + word).trim().length > 30) {
+        n += center(baris.trim()) + '\n';
+        baris = word;
+      } else {
+        baris = (baris + ' ' + word).trim();
+      }
+    });
+    if (baris) n += center(baris.trim()) + '\n';
   }
   return n;
 }
